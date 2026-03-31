@@ -1,0 +1,106 @@
+spec_version: 1
+name: hospital_scheduler
+type: space
+runtime: fastapi
+app: server.app:app
+port: 7860
+
+description: >
+  Hospital appointment scheduling environment where AI agents must review patient
+  symptoms, determine the correct department, verify insurance, and book appointments.
+  Features 7 departments, 12 doctors, 10 patients, insurance traps, emergency triage,
+  and waitlist management. Agents never see the raw database -- they discover everything
+  through actions.
+
+version: "2.0.0"
+authors:
+  - name: Sumanth Boppa
+
+actions:
+  - search_doctors
+  - check_availability
+  - book_appointment
+  - cancel_appointment
+  - reschedule_appointment
+  - get_patient_info
+  - list_departments
+  - get_appointment_details
+  - verify_insurance
+  - check_waitlist
+  - add_to_waitlist
+  - get_doctor_schedule
+  - finish
+
+tasks:
+  - id: task_easy
+    name: Symptom-Based Booking
+    description: >
+      Patient arrives with chest pain. Agent must look up records, determine the
+      correct department from symptoms, and book the earliest appointment.
+    difficulty: easy
+    max_steps: 15
+    grader: graders:grade_task_easy
+    config_file: tasks/task_easy.json
+
+  - id: task_medium
+    name: Reschedule with Constraints
+    description: >
+      Patient with worsening knee pain needs to reschedule. Agent must review records,
+      check existing appointment, and find a new afternoon slot with the same doctor.
+    difficulty: medium
+    max_steps: 25
+    grader: graders:grade_task_medium
+    config_file: tasks/task_medium.json
+
+  - id: task_hard
+    name: Multi-Patient Symptom Triage
+    description: >
+      Three patients with different symptoms. Agent must review each patient's records,
+      determine correct departments, prioritize by urgency, and schedule all three.
+    difficulty: hard
+    max_steps: 40
+    grader: graders:grade_task_hard
+    config_file: tasks/task_hard.json
+
+  - id: task_expert
+    name: Insurance-Aware Scheduling
+    description: >
+      Two patients with insurance complications. One has expired insurance (trap!),
+      the other needs a specialist referral. Agent must verify coverage and adapt.
+    difficulty: expert
+    max_steps: 30
+    grader: graders:grade_task_expert
+    config_file: tasks/task_expert.json
+
+  - id: task_nightmare
+    name: Emergency Triage
+    description: >
+      Four patients at different urgency levels arrive simultaneously. Agent must
+      review each patient's symptoms, determine departments, verify insurance, check
+      waitlists, and schedule in correct triage order.
+    difficulty: nightmare
+    max_steps: 50
+    grader: graders:grade_task_nightmare
+    config_file: tasks/task_nightmare.json
+
+evaluation:
+  scoring: 0.0-1.0
+  partial_credit: true
+  penalties:
+    - name: repeated_actions
+      description: Penalty for repeating the exact same action 3+ times (loop detection)
+    - name: consecutive_errors
+      description: Penalty for 5+ consecutive error actions
+  metrics:
+    - name: task_score
+      description: Per-task score from the grader (0.0-1.0)
+    - name: average_score
+      description: Average score across all tasks
+    - name: steps_used
+      description: Number of steps the agent took
+    - name: patient_lookup_rate
+      description: Whether agent reviewed patient records before scheduling
+    - name: insurance_compliance
+      description: Whether agent verified insurance before booking
+    - name: triage_accuracy
+      description: Whether agent handled patients in correct urgency order

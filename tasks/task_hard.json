@@ -1,0 +1,26 @@
+{
+  "task_id": "task_hard",
+  "prompt": "Three patients are waiting in the CrestView Medical Center lobby. Review each patient's medical records, determine the appropriate department based on their symptoms, and schedule all three.\n\n1. Patient P003 (David Kim, age 58) -- Reported symptoms: severe headache, dizziness, numbness in left arm. He has a history of type 2 diabetes and previous TIA. His condition appears URGENT.\n\n2. Patient P004 (Sarah Thompson, age 28) -- Reported symptoms: back pain and stiffness. No significant medical history. She prefers Dr. Rohan Sharma (D003) if available.\n\n3. Patient P005 (Michael Rivera, age 63) -- Reported symptoms: irregular heartbeat, fatigue, chest tightness. He has a history of atrial fibrillation and coronary artery disease. He already has an existing appointment APT-202 on 2026-04-01 at 09:00 -- schedule his new appointment AFTER that date.\n\nYou must:\n1. Look up each patient's records to confirm symptoms and history\n2. Determine the appropriate department for each patient\n3. Prioritize by medical urgency (David Kim first)\n4. Avoid double-booking any slots\n5. Schedule all three patients",
+  "max_steps": 40,
+  "difficulty": "hard",
+  "initial_appointments": [
+    "APT-202"
+  ],
+  "target_patients": [
+    "P003",
+    "P004",
+    "P005"
+  ],
+  "constraints": {
+    "urgent_patient": "P003",
+    "urgent_department": "neurology",
+    "urgent_deadline": "2026-04-02",
+    "preferred_doctor_patient": "P004",
+    "preferred_doctor_id": "D003",
+    "preferred_department": "orthopedics",
+    "sequential_patient": "P005",
+    "sequential_after_appointment": "APT-202",
+    "sequential_department": "cardiology",
+    "goal": "symptom_based_multi_booking"
+  }
+}
