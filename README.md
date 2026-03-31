@@ -1,3 +1,17 @@
+---
+title: Hospital Scheduler
+emoji: 🏥
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+tags:
+  - openenv
+  - evaluation
+  - agent
+  - healthcare
+---
+
 # CrestView Medical Center — Hospital Scheduler (OpenEnv Environment)
 
 An OpenEnv-compliant evaluation environment simulating **CrestView Medical Center**, a full-service hospital where AI agents must book, reschedule, and manage patient appointments — handling insurance validation, emergency triage, waitlist management, and multi-department coordination.
