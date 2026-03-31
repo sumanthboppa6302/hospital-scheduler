@@ -1,10 +1,12 @@
 {
   "task_id": "task_nightmare",
   "prompt": "EMERGENCY TRIAGE at CrestView Medical Center: Four patients have arrived. You must assess each patient's records, determine the correct department from their symptoms, verify insurance, and schedule them in order of medical urgency.\n\n1. Patient P008 (Robert Hayes, age 72) -- Symptoms: chest pain radiating to left arm, nausea. History: previous MI (2023), hypertension, diabetes. He already has emergency appointment APT-303 but needs an URGENT cardiology follow-up the same day or next day. Insurance: FederalMed.\n\n2. Patient P007 (Tommy Nakamoto, age 7) -- Symptoms: high fever, ear pain, irritability. History: recurrent ear infections. Allergy: amoxicillin. Insurance: StateWell (requires referral for specialists). Needs care within 2 days.\n\n3. Patient P010 (Carlos Mendez, age 50) -- Symptoms: numbness in feet, blurred vision. History: type 2 diabetes, diabetic retinopathy. He has been on the neurology waitlist. Check if there are openings now. Insurance: UnionCare.\n\n4. Patient P006 (Emily Chang, age 41) -- Symptoms: skin rash, itching, spreading lesions. History: eczema. Allergy: latex. Lowest priority (routine). Insurance: AzureShield.\n\nRules:\n- Look up each patient's records before scheduling\n- Determine the correct department from symptoms\n- Triage by urgency: emergency > urgent > waitlist > routine\n- Verify insurance covers the department BEFORE booking\n- Check the waitlist for P010 before searching for openings\n- No double-bookings\n- All 4 patients must be scheduled",
-  "max_steps": 50,
+  "max_steps": 35,
   "difficulty": "nightmare",
   "initial_appointments": [
-    "APT-303"
+    "APT-303",
+    "APT-505",
+    "APT-606"
   ],
   "target_patients": [
     "P008",

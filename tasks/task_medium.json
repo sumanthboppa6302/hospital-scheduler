@@ -1,7 +1,7 @@
 {
   "task_id": "task_medium",
   "prompt": "Patient Jane Martinez (P002) calls CrestView Medical Center. She reports worsening knee pain and swelling from a previous ACL tear.\n\nShe already has an existing appointment (APT-101) but needs to reschedule it to next week (between 2026-04-06 and 2026-04-10) because of a work conflict. She is only available after 2:00 PM and wants to keep the same doctor.\n\nYou must:\n1. Look up the patient records to understand her condition and history\n2. Check her existing appointment details to find the current doctor\n3. Find an available afternoon slot with the same doctor next week\n4. Reschedule her appointment to the new slot",
-  "max_steps": 25,
+  "max_steps": 15,
   "difficulty": "medium",
   "initial_appointments": [
     "APT-101"

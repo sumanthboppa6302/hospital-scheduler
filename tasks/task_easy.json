@@ -1,9 +1,9 @@
 {
   "task_id": "task_easy",
   "prompt": "A patient has just arrived at CrestView Medical Center reception.\n\nPatient ID: P001 (Marcus Webb)\n\nHe reports chest pain and shortness of breath. Review his medical records to understand his history and symptoms, find the appropriate department and an available doctor, and schedule him for the earliest available appointment on 2026-04-01.\n\nYou must:\n1. Look up the patient's information to understand their condition\n2. Determine which department is appropriate based on their symptoms\n3. Search for available doctors in that department\n4. Check doctor availability and book the earliest slot",
-  "max_steps": 15,
+  "max_steps": 10,
   "difficulty": "easy",
-  "initial_appointments": [],
+  "initial_appointments": ["APT-202"],
   "target_patients": [
     "P001"
   ],

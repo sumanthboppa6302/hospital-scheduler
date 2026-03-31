@@ -48,7 +48,8 @@ def grade_task_easy(env: HospitalEnv) -> float:
     booked = [a for a in env.appointments if a.patient_id == target_patient and a.status == AppointmentStatus.SCHEDULED]
     if booked:
         score += 0.40
-        if booked[0].slot.start_time == "09:00" and booked[0].slot.date == "2026-04-01":
+        # Reward booking an early slot on the correct date (09:00 is pre-booked, so agent must check availability)
+        if booked[0].slot.date == "2026-04-01" and booked[0].slot.start_time < "12:00":
             score += 0.20
 
     return min(score, 1.0)
@@ -268,8 +269,25 @@ def grade_task_nightmare(env: HospitalEnv) -> float:
     booking_order = [a.patient_id for a in env.appointments if a.appointment_id.startswith("APT-5") and a.status == AppointmentStatus.SCHEDULED]
     expected_order = [p for p in triage_order if p in booking_order]
     actual_positions = {pid: i for i, pid in enumerate(booking_order)}
-    order_correct = all(actual_positions.get(expected_order[i], 999) < actual_positions.get(expected_order[i + 1], 999) for i in range(len(expected_order) - 1))
+    order_correct = all(
+        actual_positions.get(expected_order[i], 999) < actual_positions.get(expected_order[i + 1], 999)
+        for i in range(len(expected_order) - 1)
+    )
     if order_correct and len(expected_order) >= 3:
-        score += 0.05
+        score += 0.15  # Triage order worth 3x more
+    elif len(expected_order) >= 2:
+        # Partial credit for partial correct ordering
+        correct_pairs = sum(
+            1 for i in range(len(expected_order) - 1)
+            if actual_positions.get(expected_order[i], 999) < actual_positions.get(expected_order[i + 1], 999)
+        )
+        score += 0.05 * (correct_pairs / max(len(expected_order) - 1, 1))
+
+    # Hard penalty: if routine patient (P006) is booked before emergency (P008) or urgent (P007)
+    p006_pos = actual_positions.get("P006", 999)
+    p008_pos = actual_positions.get("P008", 999)
+    p007_pos = actual_positions.get("P007", 999)
+    if p006_pos < p008_pos or p006_pos < p007_pos:
+        score = max(0.0, score - 0.15)  # Severe triage violation penalty
 
     return min(score, 1.0)

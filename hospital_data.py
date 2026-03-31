@@ -363,6 +363,23 @@ SEED_APPOINTMENTS: list[Appointment] = [
         notes="General checkup -- referred for specialist follow-up",
         urgency=UrgencyLevel.SOON,
     ),
+    # Blocker slots: pre-booked to force agents to check availability dynamically
+    Appointment(
+        appointment_id="APT-505",
+        patient_id="P002", doctor_id="D007",
+        slot=TimeSlot(slot_id="D007-0401-09", date="2026-04-01", start_time="09:00", end_time="09:30", is_available=False),
+        status=AppointmentStatus.SCHEDULED,
+        notes="Pre-existing neurology appointment -- slot unavailable",
+        urgency=UrgencyLevel.ROUTINE,
+    ),
+    Appointment(
+        appointment_id="APT-606",
+        patient_id="P005", doctor_id="D012",
+        slot=TimeSlot(slot_id="D012-0401-09", date="2026-04-01", start_time="09:00", end_time="09:30", is_available=False),
+        status=AppointmentStatus.SCHEDULED,
+        notes="Pre-existing pediatrics appointment -- slot unavailable",
+        urgency=UrgencyLevel.ROUTINE,
+    ),
 ]
 
 # ---------------------------------------------------------------------------

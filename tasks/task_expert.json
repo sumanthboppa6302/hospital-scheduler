@@ -1,7 +1,7 @@
 {
   "task_id": "task_expert",
   "prompt": "Two patients at CrestView Medical Center need appointments, but both have insurance complications. You must verify coverage BEFORE booking.\n\n1. Patient P004 (Sarah Thompson, age 28) -- Symptoms: back pain and stiffness. Her insurance is VeriCare. She originally wanted an orthopedics appointment, but verify her insurance first. If her plan has issues, find an alternative -- either a department her insurance covers or a different approach.\n\n2. Patient P009 (Lisa Nakamura, age 35) -- Symptoms: persistent cough, fatigue, and weight loss. She had a general checkup (appointment APT-404) where she was referred for specialist follow-up. Her insurance is GuardianPlan. Review her referral appointment notes, then find an appropriate specialist who accepts her insurance.\n\nYou must:\n1. Look up each patient's records and symptoms\n2. Verify insurance coverage BEFORE booking\n3. If insurance doesn't cover a department, find an alternative solution\n4. Check referral details for P009 before booking her specialist\n5. Ensure all booked doctors accept the patient's insurance",
-  "max_steps": 30,
+  "max_steps": 20,
   "difficulty": "expert",
   "initial_appointments": [
     "APT-404"
