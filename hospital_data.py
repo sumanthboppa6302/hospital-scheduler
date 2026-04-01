@@ -1,4 +1,4 @@
-"""Simulated hospital database -- doctors, patients, insurance, and seed data."""
+"""Hospital database: insurance plans, doctors, patients, appointments, waitlist."""
 
 from models import (
     Appointment,
@@ -12,10 +12,6 @@ from models import (
     UrgencyLevel,
     WaitlistEntry,
 )
-
-# ---------------------------------------------------------------------------
-# Insurance Plans
-# ---------------------------------------------------------------------------
 
 INSURANCE_PLANS: dict[str, InsurancePlan] = {
     "AzureShield": InsurancePlan(
@@ -45,7 +41,7 @@ INSURANCE_PLANS: dict[str, InsurancePlan] = {
     "VeriCare": InsurancePlan(
         plan_name="VeriCare Standard",
         provider="VeriCare",
-        status=InsuranceStatus.EXPIRED,  # EXPIRED -- trap for the agent
+        status=InsuranceStatus.EXPIRED,
         covered_departments=["orthopedics", "general_medicine"],
         copay=35.0,
         requires_referral=True,
@@ -76,12 +72,7 @@ INSURANCE_PLANS: dict[str, InsurancePlan] = {
     ),
 }
 
-# ---------------------------------------------------------------------------
-# Doctors (with insurance + leave)
-# ---------------------------------------------------------------------------
-
 DOCTORS: list[Doctor] = [
-    # --- Cardiology ---
     Doctor(
         doctor_id="D001", name="Dr. Anaya Srivastava",
         department=Department.CARDIOLOGY, specialization="Interventional Cardiology",
@@ -110,7 +101,6 @@ DOCTORS: list[Doctor] = [
             TimeSlot(slot_id="D002-0403-10", date="2026-04-03", start_time="10:00", end_time="10:30"),
         ],
     ),
-    # --- Orthopedics ---
     Doctor(
         doctor_id="D003", name="Dr. Rohan Sharma",
         department=Department.ORTHOPEDICS, specialization="Sports Medicine",
@@ -136,7 +126,6 @@ DOCTORS: list[Doctor] = [
             TimeSlot(slot_id="D004-0403-09", date="2026-04-03", start_time="09:00", end_time="09:30"),
         ],
     ),
-    # --- Dermatology ---
     Doctor(
         doctor_id="D005", name="Dr. Lisa Wang",
         department=Department.DERMATOLOGY, specialization="Clinical Dermatology",
@@ -160,7 +149,6 @@ DOCTORS: list[Doctor] = [
             TimeSlot(slot_id="D006-0403-15", date="2026-04-03", start_time="15:00", end_time="15:30"),
         ],
     ),
-    # --- Neurology ---
     Doctor(
         doctor_id="D007", name="Dr. Amanda Foster",
         department=Department.NEUROLOGY, specialization="Neurophysiology",
@@ -185,7 +173,6 @@ DOCTORS: list[Doctor] = [
             TimeSlot(slot_id="D008-0403-14", date="2026-04-03", start_time="14:00", end_time="14:30"),
         ],
     ),
-    # --- General Medicine ---
     Doctor(
         doctor_id="D009", name="Dr. Priya Reddy",
         department=Department.GENERAL_MEDICINE, specialization="Internal Medicine",
@@ -210,7 +197,6 @@ DOCTORS: list[Doctor] = [
             TimeSlot(slot_id="D010-0403-11", date="2026-04-03", start_time="11:00", end_time="11:30"),
         ],
     ),
-    # --- Emergency ---
     Doctor(
         doctor_id="D011", name="Dr. Rachel Torres",
         department=Department.EMERGENCY, specialization="Emergency Medicine",
@@ -224,7 +210,6 @@ DOCTORS: list[Doctor] = [
             TimeSlot(slot_id="D011-0402-14", date="2026-04-02", start_time="14:00", end_time="14:30"),
         ],
     ),
-    # --- Pediatrics ---
     Doctor(
         doctor_id="D012", name="Dr. Nancy Patel",
         department=Department.PEDIATRICS, specialization="General Pediatrics",
@@ -238,10 +223,6 @@ DOCTORS: list[Doctor] = [
         ],
     ),
 ]
-
-# ---------------------------------------------------------------------------
-# Patients (with urgency, allergies, medical history)
-# ---------------------------------------------------------------------------
 
 PATIENTS: list[Patient] = [
     Patient(
@@ -271,7 +252,7 @@ PATIENTS: list[Patient] = [
     Patient(
         patient_id="P004", name="Sarah Thompson", age=28,
         symptoms=["back pain", "stiffness"],
-        insurance="VeriCare", phone="555-0104",  # EXPIRED insurance
+        insurance="VeriCare", phone="555-0104",
         urgency=UrgencyLevel.ROUTINE,
         allergies=[],
         medical_history=[],
@@ -326,10 +307,6 @@ PATIENTS: list[Patient] = [
     ),
 ]
 
-# ---------------------------------------------------------------------------
-# Pre-existing appointments
-# ---------------------------------------------------------------------------
-
 SEED_APPOINTMENTS: list[Appointment] = [
     Appointment(
         appointment_id="APT-101",
@@ -363,13 +340,12 @@ SEED_APPOINTMENTS: list[Appointment] = [
         notes="General checkup -- referred for specialist follow-up",
         urgency=UrgencyLevel.SOON,
     ),
-    # Blocker slots: pre-booked to force agents to check availability dynamically
     Appointment(
         appointment_id="APT-505",
         patient_id="P002", doctor_id="D007",
         slot=TimeSlot(slot_id="D007-0401-09", date="2026-04-01", start_time="09:00", end_time="09:30", is_available=False),
         status=AppointmentStatus.SCHEDULED,
-        notes="Pre-existing neurology appointment -- slot unavailable",
+        notes="Neurology consult",
         urgency=UrgencyLevel.ROUTINE,
     ),
     Appointment(
@@ -377,14 +353,10 @@ SEED_APPOINTMENTS: list[Appointment] = [
         patient_id="P005", doctor_id="D012",
         slot=TimeSlot(slot_id="D012-0401-09", date="2026-04-01", start_time="09:00", end_time="09:30", is_available=False),
         status=AppointmentStatus.SCHEDULED,
-        notes="Pre-existing pediatrics appointment -- slot unavailable",
+        notes="Pediatrics well-visit",
         urgency=UrgencyLevel.ROUTINE,
     ),
 ]
-
-# ---------------------------------------------------------------------------
-# Seed waitlist
-# ---------------------------------------------------------------------------
 
 SEED_WAITLIST: list[WaitlistEntry] = [
     WaitlistEntry(
@@ -395,9 +367,6 @@ SEED_WAITLIST: list[WaitlistEntry] = [
     ),
 ]
 
-# ---------------------------------------------------------------------------
-# Lookup helpers
-# ---------------------------------------------------------------------------
 
 def get_doctor(doctor_id: str) -> Doctor | None:
     return next((d for d in DOCTORS if d.doctor_id == doctor_id), None)
@@ -417,7 +386,6 @@ def get_insurance_plan(provider: str) -> InsurancePlan | None:
 
 
 def check_insurance_coverage(patient_id: str, department: str) -> dict:
-    """Check if a patient's insurance covers a department."""
     patient = get_patient(patient_id)
     if not patient:
         return {"covered": False, "reason": "Patient not found"}

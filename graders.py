@@ -1,12 +1,4 @@
-"""Task-specific graders that compute final scores (0.0 - 1.0).
-
-Graders reward:
-- Looking up patient records (symptom-based reasoning)
-- Correct department selection based on symptoms
-- Insurance verification before booking
-- Proper triage ordering
-- No double-bookings
-"""
+"""Graders for each task tier. Each returns a float in [0.0, 1.0]."""
 
 from __future__ import annotations
 

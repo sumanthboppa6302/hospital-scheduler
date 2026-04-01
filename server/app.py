@@ -1,8 +1,4 @@
-"""FastAPI application for the Hospital Scheduling OpenEnv Environment.
-
-Uses openenv create_app for spec-compliant endpoints, plus custom
-/tasks, /grader, /baseline endpoints required by the hackathon.
-"""
+"""FastAPI server for the Hospital Scheduler OpenEnv environment."""
 
 from __future__ import annotations
 
@@ -10,18 +6,12 @@ import json
 import sys
 from pathlib import Path
 
-# Ensure parent dir is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-try:
-    from openenv.core.env_server.http_server import create_app
-except ImportError as e:
-    raise ImportError("openenv-core is required. Install with: pip install openenv-core") from e
-
+from openenv.core.env_server.http_server import create_app
 from models import HospitalAction, HospitalObservation, ActionType
 from server.hospital_environment import HospitalEnvironment, TASK_IDS
 
-# Create the OpenEnv-compliant app
 app = create_app(
     HospitalEnvironment,
     HospitalAction,
@@ -29,11 +19,6 @@ app = create_app(
     env_name="hospital_scheduler",
     max_concurrent_envs=4,
 )
-
-
-# ---------------------------------------------------------------------------
-# Additional hackathon-required endpoints
-# ---------------------------------------------------------------------------
 
 from fastapi import HTTPException
 from pydantic import BaseModel

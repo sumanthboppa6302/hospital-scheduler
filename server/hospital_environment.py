@@ -1,7 +1,4 @@
-"""OpenEnv-compliant Hospital Scheduling Environment.
-
-Wraps the core HospitalEnv logic into the openenv Environment interface.
-"""
+"""OpenEnv Environment wrapper for the hospital scheduler."""
 
 from __future__ import annotations
 
@@ -12,24 +9,17 @@ from uuid import uuid4
 
 from openenv.core.env_server.interfaces import Environment
 
-# Ensure parent dir is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from env import HospitalEnv
 from graders import grade
 from models import HospitalAction, HospitalObservation, HospitalState, ActionType
 
-
-# Map of task_id aliases for reset kwargs
 TASK_IDS = ["task_easy", "task_medium", "task_hard", "task_expert", "task_nightmare"]
 
 
 class HospitalEnvironment(Environment[HospitalAction, HospitalObservation, HospitalState]):
-    """OpenEnv Environment for hospital appointment scheduling.
-
-    Agents receive patient symptoms and must determine the correct department,
-    verify insurance, and book appointments -- all through discovery actions.
-    """
+    """Hospital appointment scheduling environment for OpenEnv."""
 
     SUPPORTS_CONCURRENT_SESSIONS: bool = True
 
@@ -83,14 +73,10 @@ class HospitalEnvironment(Environment[HospitalAction, HospitalObservation, Hospi
         timeout_s: Optional[float] = None,
         **kwargs: Any,
     ) -> HospitalObservation:
-        from models import ActionType as AT
-        from models import HospitalAction as HA
-
-        # Convert to internal action
         try:
-            action_type = AT(action.action_type)
+            action_type = ActionType(action.action_type)
         except ValueError:
-            valid = [a.value for a in AT]
+            valid = [a.value for a in ActionType]
             return HospitalObservation(
                 status="error",
                 message=f"Unknown action_type: {action.action_type}. Valid: {valid}",
@@ -100,11 +86,8 @@ class HospitalEnvironment(Environment[HospitalAction, HospitalObservation, Hospi
                 max_steps=self._env.task_config.max_steps if self._env.task_config else 0,
             )
 
-        from models import HospitalAction as _  # noqa
-        # Build internal Action object
         from env import Action as InternalAction
         internal_action = InternalAction(action_type=action_type, parameters=action.parameters)
-
         obs = self._env.step(internal_action)
 
         self._state.step_count = self._env.step_number
@@ -139,7 +122,6 @@ class HospitalEnvironment(Environment[HospitalAction, HospitalObservation, Hospi
         )
 
     def get_grade(self) -> float:
-        """Return the grader score for the current episode."""
         return grade(self._env)
 
     def get_metadata(self):
@@ -147,5 +129,5 @@ class HospitalEnvironment(Environment[HospitalAction, HospitalObservation, Hospi
         return EnvironmentMetadata(
             name="HospitalScheduler",
             description="Hospital appointment scheduling with insurance, triage, and waitlist management",
-            version="1.0.0",
+            version="2.0.0",
         )
