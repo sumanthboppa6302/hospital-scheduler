@@ -94,6 +94,12 @@ def list_tasks():
     }
 
 
+@app.get("/", tags=["Health"])
+def health_check():
+    """Health check endpoint — required by hackathon validator."""
+    return {"status": "ok", "name": "hospital_scheduler", "version": "2.0.0"}
+
+
 @app.get("/grader", tags=["Environment Info"])
 def run_grader():
     """Return grader score after an episode is completed.
@@ -157,7 +163,8 @@ def _get_heuristic_sequences():
             ("get_patient_info", {"patient_id": "P001"}),
             ("search_doctors", {"department": "cardiology", "date": "2026-04-01"}),
             ("check_availability", {"doctor_id": "D001", "date": "2026-04-01"}),
-            ("book_appointment", {"doctor_id": "D001", "patient_id": "P001", "slot_id": "D001-0401-09"}),
+            # D001-0401-09 is pre-booked by APT-202; use next available slot
+            ("book_appointment", {"doctor_id": "D001", "patient_id": "P001", "slot_id": "D001-0401-10"}),
         ],
         "task_medium": [
             ("get_patient_info", {"patient_id": "P002"}),
@@ -169,7 +176,8 @@ def _get_heuristic_sequences():
             ("get_patient_info", {"patient_id": "P003"}),
             ("search_doctors", {"department": "neurology", "date": "2026-04-01"}),
             ("check_availability", {"doctor_id": "D007", "date": "2026-04-01"}),
-            ("book_appointment", {"doctor_id": "D007", "patient_id": "P003", "slot_id": "D007-0401-09"}),
+            # D007-0401-09 is pre-booked by APT-505; use next available slot
+            ("book_appointment", {"doctor_id": "D007", "patient_id": "P003", "slot_id": "D007-0401-14"}),
             ("get_patient_info", {"patient_id": "P004"}),
             ("search_doctors", {"department": "orthopedics", "date": "2026-04-01"}),
             ("book_appointment", {"doctor_id": "D003", "patient_id": "P004", "slot_id": "D003-0401-14"}),
