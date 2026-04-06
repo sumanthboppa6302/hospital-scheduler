@@ -20,10 +20,14 @@ app = create_app(
     max_concurrent_envs=4,
 )
 
+import asyncio
+import re
+import os
 from fastapi import HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from typing import Optional
 
 # Serve frontend
 _FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
@@ -232,6 +236,181 @@ def _get_heuristic_sequences():
             ("book_appointment", {"doctor_id": "D005", "patient_id": "P006", "slot_id": "D005-0401-09"}),
         ],
     }
+
+
+AGENT_SYSTEM_PROMPT = """You are a hospital appointment scheduling agent at CrestView Medical Center (v2.1.0).
+You interact with a hospital management system by choosing one action per turn.
+
+Available actions (use exact action_type values):
+- get_patient_info        {"patient_id": "P001"}
+- search_doctors          {"department": "cardiology", "date": "2026-04-01"}
+- check_availability      {"doctor_id": "D001", "date": "2026-04-01"}
+- book_appointment        {"doctor_id": "D001", "patient_id": "P001", "slot_id": "D001-0401-09", "appointment_type": "consultation"}
+- reschedule_appointment  {"appointment_id": "APT-101", "new_slot_id": "D003-0406-14"}
+- cancel_appointment      {"appointment_id": "APT-101"}
+- get_appointment_details {"appointment_id": "APT-101"}
+- verify_insurance        {"patient_id": "P001", "department": "cardiology"}
+- list_departments        {}
+- check_waitlist          {"department": "neurology"}
+- add_to_waitlist         {"patient_id": "P001", "department": "neurology"}
+- get_doctor_schedule     {"doctor_id": "D001"}
+- get_working_hours       {"doctor_id": "D001"}
+- request_referral        {"patient_id": "P001", "referring_doctor_id": "D009"}
+- request_preauth         {"patient_id": "P001", "department": "orthopedics"}
+- check_preauth_status    {"patient_id": "P001", "department": "orthopedics"}
+- check_waitlist_offers   {"patient_id": "P001"}
+- accept_waitlist_offer   {"patient_id": "P001"}
+- finish                  {}
+
+Appointment types: follow_up (15 min), consultation (30 min), procedure (60 min).
+Doctors have working_hours and working_days — only book within their schedule.
+
+Rules:
+1. Call get_patient_info first.
+2. Call verify_insurance before booking — some plans require referral or pre-authorization.
+3. If referral required: call request_referral with a GP doctor_id before booking.
+4. If preauth required: call request_preauth then check_preauth_status (must be approved).
+5. Always call check_availability before booking.
+6. Book patients in triage order: emergency > urgent > routine.
+7. Call finish when all goals are met.
+8. Never repeat a failed action — adapt based on the error.
+
+Respond with ONLY a valid JSON object, no explanation, no markdown:
+{"action_type": "...", "parameters": {...}}"""
+
+
+class AgentRunRequest(BaseModel):
+    task_id: str
+    api_base: str = "https://api-inference.huggingface.co/v1"
+    model_name: str = "meta-llama/Llama-3.3-70B-Instruct"
+    api_key: Optional[str] = None
+    max_steps: Optional[int] = None
+
+
+def _parse_action(text: str) -> dict | None:
+    text = text.strip()
+    if "```" in text:
+        text = re.sub(r"```(?:json)?", "", text).strip()
+    match = re.search(r"\{[^{}]*\}", text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group())
+        except json.JSONDecodeError:
+            pass
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return None
+
+
+def _sse(event_type: str, data: dict) -> str:
+    return f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
+
+
+@app.post("/agent/run", tags=["Agent"])
+async def agent_run(req: AgentRunRequest):
+    """Run an LLM agent on a task and stream steps as Server-Sent Events."""
+    from env import HospitalEnv, Action
+    from graders import grade as grade_fn
+    from models import ActionType as AT
+
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise HTTPException(status_code=500, detail="openai package not installed")
+
+    api_key = req.api_key or os.environ.get("HF_TOKEN", "noop")
+    client = OpenAI(base_url=req.api_base, api_key=api_key)
+
+    async def stream():
+        env = HospitalEnv()
+        obs = env.reset(req.task_id)
+        max_steps = req.max_steps or obs.max_steps or 30
+
+        yield _sse("reset", {
+            "task_id": req.task_id,
+            "message": obs.message,
+            "max_steps": max_steps,
+        })
+
+        messages = [
+            {"role": "user", "content": f"Task:\n{obs.message}\n\nBegin. What is your first action?"}
+        ]
+
+        for step_i in range(1, max_steps + 1):
+            # Ask LLM
+            try:
+                response = await asyncio.to_thread(
+                    client.chat.completions.create,
+                    model=req.model_name,
+                    messages=[{"role": "system", "content": AGENT_SYSTEM_PROMPT}] + messages,
+                    max_tokens=256,
+                    temperature=0.0,
+                )
+                llm_text = response.choices[0].message.content or ""
+            except Exception as e:
+                yield _sse("error", {"message": f"LLM error: {e}"})
+                break
+
+            action_data = _parse_action(llm_text)
+            if action_data is None:
+                yield _sse("thinking", {"step": step_i, "llm_raw": llm_text, "error": "invalid JSON, retrying"})
+                messages.append({"role": "assistant", "content": llm_text})
+                messages.append({"role": "user", "content": "Invalid JSON. Respond with ONLY a JSON action object."})
+                continue
+
+            action_type = action_data.get("action_type", "")
+            parameters = action_data.get("parameters", {})
+
+            yield _sse("thinking", {"step": step_i, "action_type": action_type, "parameters": parameters})
+
+            # Execute in env
+            try:
+                action = Action(action_type=AT(action_type), parameters=parameters)
+                obs = env.step(action)
+            except Exception as e:
+                yield _sse("step", {
+                    "step": step_i, "action_type": action_type, "parameters": parameters,
+                    "status": "error", "message": str(e), "reward": env.current_reward, "done": False,
+                })
+                messages.append({"role": "assistant", "content": json.dumps(action_data)})
+                messages.append({"role": "user", "content": f"Error: {e}\n\nWhat is your next action?"})
+                continue
+
+            yield _sse("step", {
+                "step": step_i,
+                "action_type": action_type,
+                "parameters": parameters,
+                "status": obs.status,
+                "message": obs.message,
+                "data": obs.data,
+                "reward": obs.reward,
+                "done": obs.done,
+                "step_number": obs.step_number,
+                "max_steps": obs.max_steps,
+            })
+
+            if obs.done:
+                break
+
+            messages.append({"role": "assistant", "content": json.dumps(action_data)})
+            result_text = f"Result: {obs.message}"
+            if obs.data:
+                result_text += f"\nData: {json.dumps(obs.data)[:600]}"
+            result_text += "\n\nWhat is your next action?"
+            messages.append({"role": "user", "content": result_text})
+
+        score = grade_fn(env)
+        yield _sse("done", {
+            "score": round(score, 4),
+            "steps_used": env.step_number,
+            "max_steps": max_steps,
+        })
+
+    return StreamingResponse(stream(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+    })
 
 
 def main(host: str = "0.0.0.0", port: int = 7860):

@@ -363,6 +363,83 @@
     .score-big { font-size: 40px; font-weight: 800; }
     .score-sub { font-size: 13px; opacity: .8; margin-top: 2px; }
 
+    /* Mode tabs */
+    .mode-tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid var(--gray-200);
+      margin-bottom: 12px;
+    }
+    .mode-tab {
+      padding: 7px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--gray-400);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all .15s;
+    }
+    .mode-tab:hover { color: var(--gray-700); }
+    .mode-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+    .mode-panel { display: none; }
+    .mode-panel.active { display: block; }
+
+    /* Agent config */
+    .agent-config { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 10px; }
+    .agent-config input[type="text"] { width: 200px; }
+    .agent-config input.wide { width: 320px; }
+    .btn-agent {
+      padding: 7px 18px;
+      background: #7c3aed;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      height: 34px;
+      transition: background .15s;
+    }
+    .btn-agent:hover:not(:disabled) { background: #6d28d9; }
+    .btn-agent:disabled { background: var(--gray-300); cursor: not-allowed; }
+    .btn-agent-stop {
+      padding: 7px 18px;
+      background: var(--red);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      height: 34px;
+      display: none;
+    }
+    .btn-agent-stop:hover { background: #b91c1c; }
+
+    /* Agent thinking bubble */
+    .thinking-card {
+      background: #f5f3ff;
+      border: 1px solid #c4b5fd;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: #5b21b6;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .thinking-spinner {
+      width: 14px; height: 14px;
+      border: 2px solid #c4b5fd;
+      border-top-color: #7c3aed;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
     /* Scrollbar */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -466,37 +543,71 @@
 
     <!-- Action panel -->
     <div class="action-panel">
-      <div class="action-panel-title">Send Action</div>
-      <div class="action-row">
-        <div class="field-group">
-          <div class="field-label">Action Type</div>
-          <select id="action-type-select" onchange="renderParams()">
-            <option value="">— select —</option>
-            <option value="get_patient_info">get_patient_info</option>
-            <option value="search_doctors">search_doctors</option>
-            <option value="check_availability">check_availability</option>
-            <option value="book_appointment">book_appointment</option>
-            <option value="cancel_appointment">cancel_appointment</option>
-            <option value="reschedule_appointment">reschedule_appointment</option>
-            <option value="list_departments">list_departments</option>
-            <option value="get_appointment_details">get_appointment_details</option>
-            <option value="get_doctor_schedule">get_doctor_schedule</option>
-            <option value="get_working_hours">get_working_hours</option>
-            <option value="verify_insurance">verify_insurance</option>
-            <option value="check_waitlist">check_waitlist</option>
-            <option value="add_to_waitlist">add_to_waitlist</option>
-            <option value="request_referral">request_referral</option>
-            <option value="request_preauth">request_preauth</option>
-            <option value="check_preauth_status">check_preauth_status</option>
-            <option value="check_waitlist_offers">check_waitlist_offers</option>
-            <option value="accept_waitlist_offer">accept_waitlist_offer</option>
-            <option value="finish">finish</option>
-          </select>
+      <div class="mode-tabs">
+        <div class="mode-tab active" id="tab-manual" onclick="switchMode('manual')">Manual Mode</div>
+        <div class="mode-tab" id="tab-agent" onclick="switchMode('agent')">Agent Mode (LLM)</div>
+      </div>
+
+      <!-- Manual mode -->
+      <div class="mode-panel active" id="panel-manual">
+        <div class="action-row">
+          <div class="field-group">
+            <div class="field-label">Action Type</div>
+            <select id="action-type-select" onchange="renderParams()">
+              <option value="">— select —</option>
+              <option value="get_patient_info">get_patient_info</option>
+              <option value="search_doctors">search_doctors</option>
+              <option value="check_availability">check_availability</option>
+              <option value="book_appointment">book_appointment</option>
+              <option value="cancel_appointment">cancel_appointment</option>
+              <option value="reschedule_appointment">reschedule_appointment</option>
+              <option value="list_departments">list_departments</option>
+              <option value="get_appointment_details">get_appointment_details</option>
+              <option value="get_doctor_schedule">get_doctor_schedule</option>
+              <option value="get_working_hours">get_working_hours</option>
+              <option value="verify_insurance">verify_insurance</option>
+              <option value="check_waitlist">check_waitlist</option>
+              <option value="add_to_waitlist">add_to_waitlist</option>
+              <option value="request_referral">request_referral</option>
+              <option value="request_preauth">request_preauth</option>
+              <option value="check_preauth_status">check_preauth_status</option>
+              <option value="check_waitlist_offers">check_waitlist_offers</option>
+              <option value="accept_waitlist_offer">accept_waitlist_offer</option>
+              <option value="finish">finish</option>
+            </select>
+          </div>
+          <div id="params-row" class="params-row"></div>
+          <div class="field-group" style="justify-content:flex-end;">
+            <div class="field-label">&nbsp;</div>
+            <button class="btn-send" id="btn-send" disabled onclick="sendAction()">Send ▶</button>
+          </div>
         </div>
-        <div id="params-row" class="params-row"></div>
-        <div class="field-group" style="justify-content:flex-end;">
-          <div class="field-label">&nbsp;</div>
-          <button class="btn-send" id="btn-send" disabled onclick="sendAction()">Send ▶</button>
+      </div>
+
+      <!-- Agent mode -->
+      <div class="mode-panel" id="panel-agent">
+        <div class="agent-config">
+          <div class="field-group">
+            <div class="field-label">API Base URL</div>
+            <input type="text" id="agent-api-base" class="wide"
+              value="https://api-inference.huggingface.co/v1"
+              placeholder="https://api-inference.huggingface.co/v1" />
+          </div>
+          <div class="field-group">
+            <div class="field-label">Model</div>
+            <input type="text" id="agent-model"
+              value="meta-llama/Llama-3.3-70B-Instruct"
+              placeholder="meta-llama/Llama-3.3-70B-Instruct" />
+          </div>
+          <div class="field-group">
+            <div class="field-label">API Key <span class="optional">(opt)</span></div>
+            <input type="text" id="agent-api-key" placeholder="hf_..." />
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="btn-agent" id="btn-agent-run" onclick="runAgent()">Run Agent ▶</button>
+          <button class="btn-agent-stop" id="btn-agent-stop" onclick="stopAgent()">Stop ■</button>
+          <span id="agent-status" style="font-size:12px;color:var(--gray-400);"></span>
         </div>
       </div>
     </div>
@@ -803,6 +914,187 @@ function makeParamField(name, optional) {
            placeholder="${PARAM_HINTS[name] || ''}" />
   `;
   return div;
+}
+
+// ── Mode switching ─────────────────────────────────────────────────────────
+function switchMode(mode) {
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + mode).classList.add('active');
+  document.getElementById('panel-' + mode).classList.add('active');
+}
+
+// ── Agent Mode ─────────────────────────────────────────────────────────────
+let agentEventSource = null;
+let thinkingCard = null;
+
+function runAgent() {
+  const apiBase = document.getElementById('agent-api-base').value.trim();
+  const modelName = document.getElementById('agent-model').value.trim();
+  const apiKey = document.getElementById('agent-api-key').value.trim();
+
+  if (!apiBase || !modelName) {
+    alert('API Base URL and Model Name are required.');
+    return;
+  }
+
+  // Clear log
+  document.getElementById('log-panel').innerHTML = '';
+  stepNumber = 0;
+  updateStats({ step_number: 0, max_steps: 0, reward: 0, data: {} });
+  document.getElementById('stat-score').textContent = '0.00';
+  document.getElementById('stat-appts').textContent = '0';
+  document.getElementById('prompt-box').innerHTML = '<span class="prompt-empty">Agent running…</span>';
+
+  const body = { task_id: selectedTask, api_base: apiBase, model_name: modelName };
+  if (apiKey) body.api_key = apiKey;
+
+  // Toggle buttons
+  document.getElementById('btn-agent-run').style.display = 'none';
+  document.getElementById('btn-agent-stop').style.display = '';
+  document.getElementById('agent-status').textContent = 'Connecting…';
+
+  // Use fetch + ReadableStream (EventSource doesn't support POST)
+  const ctrl = new AbortController();
+  agentEventSource = ctrl;
+
+  const API_BASE = (location.protocol === 'file:') ? 'http://localhost:7860' : '';
+
+  fetch(`${API_BASE}/agent/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: ctrl.signal,
+  }).then(resp => {
+    if (!resp.ok) {
+      resp.json().then(e => addLogEntry('error', 'Error', { message: JSON.stringify(e) }, 'entry-error'));
+      resetAgentButtons();
+      return;
+    }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    function readChunk() {
+      reader.read().then(({ done, value }) => {
+        if (done) { resetAgentButtons(); return; }
+        buf += decoder.decode(value, { stream: true });
+        const parts = buf.split('\n\n');
+        buf = parts.pop();
+        for (const part of parts) {
+          if (!part.trim()) continue;
+          const lines = part.split('\n');
+          let eventType = 'message', dataLine = '';
+          for (const l of lines) {
+            if (l.startsWith('event: ')) eventType = l.slice(7).trim();
+            if (l.startsWith('data: ')) dataLine = l.slice(6);
+          }
+          try {
+            const data = JSON.parse(dataLine);
+            handleAgentEvent(eventType, data);
+          } catch {}
+        }
+        readChunk();
+      }).catch(() => resetAgentButtons());
+    }
+    readChunk();
+  }).catch(err => {
+    if (err.name !== 'AbortError') {
+      addLogEntry('error', 'Agent Error', { message: String(err) }, 'entry-error');
+    }
+    resetAgentButtons();
+  });
+}
+
+function stopAgent() {
+  if (agentEventSource) {
+    agentEventSource.abort();
+    agentEventSource = null;
+  }
+  removeThinkingCard();
+  document.getElementById('agent-status').textContent = 'Stopped.';
+  resetAgentButtons();
+}
+
+function resetAgentButtons() {
+  document.getElementById('btn-agent-run').style.display = '';
+  document.getElementById('btn-agent-stop').style.display = 'none';
+  removeThinkingCard();
+}
+
+function removeThinkingCard() {
+  if (thinkingCard) { thinkingCard.remove(); thinkingCard = null; }
+}
+
+function handleAgentEvent(type, data) {
+  removeThinkingCard();
+
+  if (type === 'reset') {
+    addLogEntry('reset', 'Episode Started', { message: data.message, status: 'success' }, 'entry-reset');
+    document.getElementById('prompt-box').textContent = data.message || '';
+    maxSteps = data.max_steps || 0;
+    document.getElementById('stat-max').textContent = maxSteps || '—';
+    document.getElementById('agent-status').textContent = `Running on ${selectedTask}…`;
+
+  } else if (type === 'thinking') {
+    // Show a spinner card while LLM decides
+    const panel = document.getElementById('log-panel');
+    const card = document.createElement('div');
+    card.className = 'thinking-card';
+    const action = data.action_type ? `Deciding: ${data.action_type}(${JSON.stringify(data.parameters || {})})` : 'Thinking…';
+    card.innerHTML = `<div class="thinking-spinner"></div><span>${escHtml(action)}</span>`;
+    panel.appendChild(card);
+    card.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    thinkingCard = card;
+
+  } else if (type === 'step') {
+    stepNumber = data.step_number ?? stepNumber + 1;
+    maxSteps = data.max_steps ?? maxSteps;
+    updateStats({ step_number: stepNumber, max_steps: maxSteps, reward: data.reward, data: data.data || {} });
+    window._lastActionType = data.action_type;
+
+    const cls = data.status === 'error' ? 'entry-error' : data.status === 'warning' ? 'entry-warning' : 'entry-success';
+    addLogEntry('step', data.status, {
+      message: data.message, status: data.status, data: data.data,
+      reward: data.reward, done: data.done,
+    }, cls, stepNumber);
+
+    document.getElementById('agent-status').textContent = `Step ${stepNumber} / ${maxSteps}`;
+
+    if (data.done) {
+      episodeActive = false;
+      resetAgentButtons();
+      document.getElementById('agent-status').textContent = 'Episode complete.';
+    }
+
+  } else if (type === 'done') {
+    addScoreBanner(data.score, data.steps_used, data.max_steps);
+    document.getElementById('stat-score').textContent = data.score.toFixed(2);
+    document.getElementById('agent-status').textContent = `Done — score: ${(data.score * 100).toFixed(0)}%`;
+    resetAgentButtons();
+
+  } else if (type === 'error') {
+    addLogEntry('error', 'Agent Error', { message: data.message, status: 'error' }, 'entry-error');
+    resetAgentButtons();
+  }
+}
+
+function addScoreBanner(score, stepsUsed, maxStps) {
+  const empty = document.getElementById('log-empty');
+  if (empty) empty.remove();
+  const panel = document.getElementById('log-panel');
+  const pct = (score * 100).toFixed(0);
+  const grade = getGrade(score);
+  const el = document.createElement('div');
+  el.innerHTML = `
+    <div class="score-banner">
+      <div style="font-size:13px;opacity:.8;margin-bottom:4px;">Agent Episode Complete</div>
+      <div class="score-big">${pct}%</div>
+      <div class="score-sub">${grade} · ${stepsUsed} steps used · ${maxStps} max</div>
+    </div>
+  `;
+  panel.appendChild(el);
+  el.scrollIntoView({ behavior: 'smooth', block: 'end' });
 }
 
 // ── Task selection ─────────────────────────────────────────────────────────
