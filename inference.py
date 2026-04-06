@@ -83,20 +83,36 @@ def get_model() -> str:
 
 def parse_action(text: str) -> dict | None:
     text = text.strip()
-    # Strip markdown code fences if present
     if "```" in text:
         text = re.sub(r"```(?:json)?", "", text).strip()
-    # Extract first JSON object
-    match = re.search(r"\{[^{}]*\}", text, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group())
-        except json.JSONDecodeError:
-            pass
+
+    # Try full text first
     try:
-        return json.loads(text)
+        data = json.loads(text)
+        if isinstance(data, dict) and data.get("action_type"):
+            return data
     except json.JSONDecodeError:
+        pass
+
+    # Find outermost JSON object using balanced brace matching
+    start = text.find('{')
+    if start == -1:
         return None
+    depth = 0
+    for i, ch in enumerate(text[start:], start):
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                try:
+                    data = json.loads(text[start:i + 1])
+                    if isinstance(data, dict) and data.get("action_type"):
+                        return data
+                except json.JSONDecodeError:
+                    pass
+                break
+    return None
 
 
 def run_task(server_url: str, task_id: str, client: OpenAI, model: str) -> float:
