@@ -206,7 +206,7 @@
     .action-panel {
       background: var(--white);
       border-bottom: 1px solid var(--gray-200);
-      padding: 14px 18px;
+      padding: 10px 18px;
       flex-shrink: 0;
     }
     .action-panel-title {
@@ -217,6 +217,18 @@
       color: var(--gray-400);
       margin-bottom: 10px;
     }
+    .panel-toggle-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 11px;
+      color: var(--gray-400);
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: auto;
+      float: right;
+    }
+    .panel-toggle-btn:hover { background: var(--gray-100); color: var(--gray-700); }
 
     .action-row { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
 
@@ -339,8 +351,7 @@
       color: var(--gray-700);
       overflow-x: auto;
       white-space: pre;
-      max-height: 300px;
-      overflow-y: auto;
+      /* no max-height — show full JSON */
     }
 
     /* Entry type colors */
@@ -542,13 +553,17 @@
   <div class="main">
 
     <!-- Action panel -->
-    <div class="action-panel">
-      <div class="mode-tabs">
-        <div class="mode-tab active" id="tab-manual" onclick="switchMode('manual')">Manual Mode</div>
-        <div class="mode-tab" id="tab-agent" onclick="switchMode('agent')">Agent Mode (LLM)</div>
+    <div class="action-panel" id="action-panel">
+      <div style="display:flex;align-items:center;margin-bottom:4px;">
+        <div class="mode-tabs" style="flex:1;margin-bottom:0;border-bottom:none;">
+          <div class="mode-tab active" id="tab-manual" onclick="switchMode('manual')">Manual Mode</div>
+          <div class="mode-tab" id="tab-agent" onclick="switchMode('agent')">Agent Mode (LLM)</div>
+        </div>
+        <button class="panel-toggle-btn" id="panel-toggle" onclick="toggleActionPanel()">▲ Hide</button>
       </div>
+      <div id="action-panel-content" style="border-top:2px solid var(--gray-200);padding-top:10px;">
 
-      <!-- Manual mode -->
+      <!-- Manual + Agent panels (collapsible) -->
       <div class="mode-panel active" id="panel-manual">
         <div class="action-row">
           <div class="field-group">
@@ -610,6 +625,8 @@
           <span id="agent-status" style="font-size:12px;color:var(--gray-400);"></span>
         </div>
       </div>
+
+      </div><!-- /action-panel-content -->
     </div>
 
     <!-- Observation log -->
@@ -922,6 +939,18 @@ function switchMode(mode) {
   document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + mode).classList.add('active');
   document.getElementById('panel-' + mode).classList.add('active');
+  // Expand panel if collapsed
+  const content = document.getElementById('action-panel-content');
+  if (content.style.display === 'none') toggleActionPanel();
+}
+
+// ── Action panel collapse ───────────────────────────────────────────────────
+function toggleActionPanel() {
+  const content = document.getElementById('action-panel-content');
+  const btn = document.getElementById('panel-toggle');
+  const hidden = content.style.display === 'none';
+  content.style.display = hidden ? '' : 'none';
+  btn.textContent = hidden ? '▲ Hide' : '▼ Show';
 }
 
 // ── Agent Mode ─────────────────────────────────────────────────────────────
