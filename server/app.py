@@ -24,10 +24,20 @@ import asyncio
 import re
 import os
 from fastapi import HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
+
+# Allow file:// origin and any localhost port (dev only)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Serve frontend
 _FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
