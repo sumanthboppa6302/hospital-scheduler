@@ -630,6 +630,11 @@
     </div>
 
     <!-- Observation log -->
+    <div style="display:flex;align-items:center;padding:6px 18px 0;gap:8px;flex-shrink:0;">
+      <span style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--gray-400);">Observation Log</span>
+      <button onclick="expandAll(true)"  style="margin-left:auto;font-size:11px;background:none;border:1px solid var(--gray-300);border-radius:4px;padding:2px 8px;cursor:pointer;color:var(--gray-600);">Expand All</button>
+      <button onclick="expandAll(false)" style="font-size:11px;background:none;border:1px solid var(--gray-300);border-radius:4px;padding:2px 8px;cursor:pointer;color:var(--gray-600);">Collapse All</button>
+    </div>
     <div class="log-panel" id="log-panel">
       <div class="log-empty" id="log-empty">
         <div class="log-empty-icon">📋</div>
@@ -795,21 +800,32 @@ function addLogEntry(type, label, obs, colorClass, step) {
   const actionType = window._lastActionType || label;
   const statusText = obs.status || label;
 
+  // Reset and error entries start expanded; steps start collapsed so all are visible
+  const startOpen = (type === 'reset' || type === 'error' || type === 'done');
+
   el.innerHTML = `
     <div class="log-entry-header ${colorClass}" onclick="toggleEntry(this)">
       <span class="entry-step">${stepLabel}</span>
       <span class="entry-action">${type === 'reset' ? '🔄 Episode Reset' : '⚡ ' + actionType}</span>
       <span class="entry-status">${statusText}</span>
-      <span class="entry-toggle">▼</span>
+      <span class="entry-toggle">${startOpen ? '▼' : '▶'}</span>
     </div>
-    <div class="log-entry-body open">
+    <div class="log-entry-body${startOpen ? ' open' : ''}">
       <div class="entry-message">${escHtml(obs.message || '')}</div>
       ${obs.data && Object.keys(obs.data).length ? `<div class="entry-data">${escHtml(JSON.stringify(obs.data, null, 2))}</div>` : ''}
     </div>
   `;
 
   panel.appendChild(el);
-  el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function expandAll(open) {
+  document.querySelectorAll('.log-entry-body').forEach(b => {
+    b.classList.toggle('open', open);
+    const toggle = b.previousElementSibling?.querySelector('.entry-toggle');
+    if (toggle) toggle.textContent = open ? '▼' : '▶';
+  });
 }
 
 function addDoneEntry(obs) {
@@ -977,6 +993,11 @@ function runAgent() {
 
   const body = { task_id: selectedTask, api_base: apiBase, model_name: modelName };
   if (apiKey) body.api_key = apiKey;
+
+  // Collapse action panel so log gets full height
+  const content = document.getElementById('action-panel-content');
+  const btn = document.getElementById('panel-toggle');
+  if (content.style.display !== 'none') { content.style.display = 'none'; btn.textContent = '▼ Show'; }
 
   // Toggle buttons
   document.getElementById('btn-agent-run').style.display = 'none';
