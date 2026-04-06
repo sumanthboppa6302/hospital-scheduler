@@ -87,9 +87,7 @@ class HospitalEnv:
         self._last_action_key: str = ""
         self._patients_looked_up: set[str] = set()
 
-    # ------------------------------------------------------------------
     # OpenEnv interface
-    # ------------------------------------------------------------------
 
     def reset(self, task_id: str) -> Observation:
         task_path = TASKS_DIR / f"{task_id}.json"
@@ -216,9 +214,7 @@ class HospitalEnv:
             action_history=self.action_history, observation_history=self.observation_history,
         )
 
-    # ------------------------------------------------------------------
     # Action handlers
-    # ------------------------------------------------------------------
 
     def _handle_search_doctors(self, params: dict[str, Any]) -> Observation:
         department = params.get("department", "")
@@ -455,9 +451,7 @@ class HospitalEnv:
             done=True,
         )
 
-    # ------------------------------------------------------------------
     # Reward helpers
-    # ------------------------------------------------------------------
 
     def _update_reward_for_patient_lookup(self, patient_id: str) -> None:
         """Reward the agent for looking up patient records (symptom-based reasoning)."""
@@ -534,9 +528,7 @@ class HospitalEnv:
             score += 0.2
         self.current_reward = max(self.current_reward, min(score, 1.0))
 
-    # ------------------------------------------------------------------
     # Internal helpers
-    # ------------------------------------------------------------------
 
     def _get_doctor(self, doctor_id: str) -> Any:
         return next((d for d in self.doctors if d.doctor_id == doctor_id), None)
