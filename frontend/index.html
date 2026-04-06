@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CrestView Medical Center — Scheduler</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue: #1a56db;
+      --blue-light: #e8f0fe;
+      --blue-mid: #3b82f6;
+      --green: #059669;
+      --green-light: #d1fae5;
+      --red: #dc2626;
+      --red-light: #fee2e2;
+      --amber: #d97706;
+      --amber-light: #fef3c7;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-400: #9ca3af;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --white: #ffffff;
+      --sidebar-w: 310px;
+      --header-h: 56px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      background: var(--gray-50);
+      color: var(--gray-800);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      height: var(--header-h);
+      background: var(--blue);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 12px;
+      flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,.2);
+    }
+    .header-icon { font-size: 22px; }
+    .header-title { font-size: 17px; font-weight: 700; letter-spacing: -.3px; }
+    .header-sub { font-size: 12px; opacity: .75; margin-left: 4px; }
+    .ws-badge {
+      margin-left: auto;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(255,255,255,.15);
+      display: flex; align-items: center; gap: 5px;
+    }
+    .ws-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #fbbf24;
+      transition: background .3s;
+    }
+    .ws-dot.connected { background: #34d399; }
+    .ws-dot.error { background: #f87171; }
+
+    /* ── Layout ── */
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: var(--sidebar-w);
+      background: var(--white);
+      border-right: 1px solid var(--gray-200);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .sidebar-section {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--gray-200);
+    }
+    .sidebar-section:last-child { border-bottom: none; }
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: var(--gray-400);
+      margin-bottom: 8px;
+    }
+
+    /* Task cards */
+    .task-cards { display: flex; flex-direction: column; gap: 6px; }
+    .task-card {
+      border: 1.5px solid var(--gray-200);
+      border-radius: 8px;
+      padding: 9px 11px;
+      cursor: pointer;
+      transition: all .15s;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .task-card:hover { border-color: var(--blue-mid); background: var(--blue-light); }
+    .task-card.active {
+      border-color: var(--blue);
+      background: var(--blue-light);
+      box-shadow: 0 0 0 2px rgba(26,86,219,.2);
+    }
+    .task-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .badge-easy { background: #d1fae5; color: #065f46; }
+    .badge-medium { background: #dbeafe; color: #1e40af; }
+    .badge-hard { background: #fef3c7; color: #92400e; }
+    .badge-expert { background: #ede9fe; color: #5b21b6; }
+    .badge-nightmare { background: #fee2e2; color: #991b1b; }
+
+    .task-name { font-weight: 600; font-size: 13px; flex: 1; }
+    .task-steps { font-size: 11px; color: var(--gray-400); }
+
+    .btn-start {
+      width: 100%;
+      padding: 9px;
+      background: var(--blue);
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: background .15s;
+    }
+    .btn-start:hover:not(:disabled) { background: #1345b7; }
+    .btn-start:disabled { background: var(--gray-300); cursor: not-allowed; }
+
+    /* Episode stats */
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stat-box {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: 6px;
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .stat-value { font-size: 20px; font-weight: 700; color: var(--blue); }
+    .stat-label { font-size: 10px; color: var(--gray-400); margin-top: 1px; }
+
+    /* Progress bar */
+    .progress-wrap { margin-top: 8px; }
+    .progress-bar-bg {
+      height: 6px; background: var(--gray-200); border-radius: 3px; overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%; background: var(--blue); border-radius: 3px;
+      transition: width .3s;
+      width: 0%;
+    }
+    .progress-label { font-size: 11px; color: var(--gray-400); margin-top: 4px; text-align: right; }
+
+    /* Prompt box */
+    .prompt-box {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--gray-700);
+      max-height: 180px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    .prompt-empty { color: var(--gray-400); font-style: italic; }
+
+    /* ── Main panel ── */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Action panel */
+    .action-panel {
+      background: var(--white);
+      border-bottom: 1px solid var(--gray-200);
+      padding: 14px 18px;
+      flex-shrink: 0;
+    }
+    .action-panel-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .7px;
+      text-transform: uppercase;
+      color: var(--gray-400);
+      margin-bottom: 10px;
+    }
+
+    .action-row { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
+
+    .field-group { display: flex; flex-direction: column; gap: 3px; }
+    .field-label { font-size: 11px; font-weight: 600; color: var(--gray-600); }
+    .field-label .optional { color: var(--gray-400); font-weight: 400; }
+
+    select, input[type="text"] {
+      border: 1.5px solid var(--gray-300);
+      border-radius: 6px;
+      padding: 6px 9px;
+      font-size: 13px;
+      outline: none;
+      color: var(--gray-800);
+      background: var(--white);
+      transition: border-color .15s;
+      height: 34px;
+    }
+    select:focus, input[type="text"]:focus { border-color: var(--blue-mid); }
+
+    #action-type-select { width: 200px; }
+
+    .params-row {
+      display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;
+    }
+    .param-input { width: 150px; }
+
+    .btn-send {
+      padding: 7px 18px;
+      background: var(--green);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      height: 34px;
+      transition: background .15s;
+      white-space: nowrap;
+    }
+    .btn-send:hover:not(:disabled) { background: #047857; }
+    .btn-send:disabled { background: var(--gray-300); cursor: not-allowed; }
+
+    /* Log panel */
+    .log-panel {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .log-empty {
+      text-align: center;
+      color: var(--gray-400);
+      font-size: 13px;
+      margin-top: 60px;
+    }
+    .log-empty-icon { font-size: 36px; margin-bottom: 8px; }
+
+    /* Log entries */
+    .log-entry {
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--gray-200);
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+
+    .log-entry-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .log-entry-header:hover { opacity: .9; }
+
+    .entry-step {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.4);
+    }
+    .entry-action { font-weight: 600; font-size: 13px; flex: 1; }
+    .entry-status {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.4);
+    }
+    .entry-toggle { font-size: 11px; opacity: .6; margin-left: 4px; }
+
+    .log-entry-body {
+      padding: 10px 12px;
+      background: var(--white);
+      border-top: 1px solid rgba(0,0,0,.06);
+      display: none;
+    }
+    .log-entry-body.open { display: block; }
+
+    .entry-message {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--gray-700);
+      white-space: pre-wrap;
+      margin-bottom: 8px;
+    }
+
+    .entry-data {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: 5px;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      color: var(--gray-700);
+      overflow-x: auto;
+      white-space: pre;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    /* Entry type colors */
+    .entry-reset   { background: #dbeafe; }
+    .entry-success { background: #d1fae5; }
+    .entry-error   { background: #fee2e2; }
+    .entry-warning { background: #fef3c7; }
+    .entry-done    { background: #ede9fe; }
+    .entry-system  { background: var(--gray-100); }
+
+    /* Score display when done */
+    .score-banner {
+      background: linear-gradient(135deg, #1a56db 0%, #7c3aed 100%);
+      color: #fff;
+      border-radius: 10px;
+      padding: 16px 20px;
+      text-align: center;
+      margin-bottom: 4px;
+    }
+    .score-big { font-size: 40px; font-weight: 800; }
+    .score-sub { font-size: 13px; opacity: .8; margin-top: 2px; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--gray-400); }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <span class="header-icon">🏥</span>
+  <span class="header-title">CrestView Medical Center</span>
+  <span class="header-sub">Hospital Scheduler v2.1.0</span>
+  <div class="ws-badge">
+    <div class="ws-dot" id="ws-dot"></div>
+    <span id="ws-label">Connecting…</span>
+  </div>
+</header>
+
+<!-- ── Layout ── -->
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+
+    <!-- Task selector -->
+    <div class="sidebar-section">
+      <div class="section-label">Select Task</div>
+      <div class="task-cards" id="task-cards">
+        <div class="task-card active" data-id="task_easy">
+          <span class="task-badge badge-easy">Easy</span>
+          <span class="task-name">Symptom Booking</span>
+          <span class="task-steps">15 steps</span>
+        </div>
+        <div class="task-card" data-id="task_medium">
+          <span class="task-badge badge-medium">Medium</span>
+          <span class="task-name">Reschedule</span>
+          <span class="task-steps">25 steps</span>
+        </div>
+        <div class="task-card" data-id="task_hard">
+          <span class="task-badge badge-hard">Hard</span>
+          <span class="task-name">Multi-Patient</span>
+          <span class="task-steps">40 steps</span>
+        </div>
+        <div class="task-card" data-id="task_expert">
+          <span class="task-badge badge-expert">Expert</span>
+          <span class="task-name">Insurance-Aware</span>
+          <span class="task-steps">25 steps</span>
+        </div>
+        <div class="task-card" data-id="task_nightmare">
+          <span class="task-badge badge-nightmare">Nightmare</span>
+          <span class="task-name">Emergency Triage</span>
+          <span class="task-steps">45 steps</span>
+        </div>
+      </div>
+      <button class="btn-start" id="btn-start" disabled>Start Episode</button>
+    </div>
+
+    <!-- Episode stats -->
+    <div class="sidebar-section">
+      <div class="section-label">Episode Stats</div>
+      <div class="stat-grid">
+        <div class="stat-box">
+          <div class="stat-value" id="stat-step">—</div>
+          <div class="stat-label">Step</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="stat-max">—</div>
+          <div class="stat-label">Max Steps</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="stat-score">—</div>
+          <div class="stat-label">Reward</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="stat-appts">—</div>
+          <div class="stat-label">Booked</div>
+        </div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progress-fill"></div>
+        </div>
+        <div class="progress-label" id="progress-label">No active episode</div>
+      </div>
+    </div>
+
+    <!-- Task prompt -->
+    <div class="sidebar-section" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+      <div class="section-label">Task Prompt</div>
+      <div class="prompt-box" id="prompt-box">
+        <span class="prompt-empty">Start an episode to see the task prompt.</span>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ── Main ── -->
+  <div class="main">
+
+    <!-- Action panel -->
+    <div class="action-panel">
+      <div class="action-panel-title">Send Action</div>
+      <div class="action-row">
+        <div class="field-group">
+          <div class="field-label">Action Type</div>
+          <select id="action-type-select" onchange="renderParams()">
+            <option value="">— select —</option>
+            <option value="get_patient_info">get_patient_info</option>
+            <option value="search_doctors">search_doctors</option>
+            <option value="check_availability">check_availability</option>
+            <option value="book_appointment">book_appointment</option>
+            <option value="cancel_appointment">cancel_appointment</option>
+            <option value="reschedule_appointment">reschedule_appointment</option>
+            <option value="list_departments">list_departments</option>
+            <option value="get_appointment_details">get_appointment_details</option>
+            <option value="get_doctor_schedule">get_doctor_schedule</option>
+            <option value="get_working_hours">get_working_hours</option>
+            <option value="verify_insurance">verify_insurance</option>
+            <option value="check_waitlist">check_waitlist</option>
+            <option value="add_to_waitlist">add_to_waitlist</option>
+            <option value="request_referral">request_referral</option>
+            <option value="request_preauth">request_preauth</option>
+            <option value="check_preauth_status">check_preauth_status</option>
+            <option value="check_waitlist_offers">check_waitlist_offers</option>
+            <option value="accept_waitlist_offer">accept_waitlist_offer</option>
+            <option value="finish">finish</option>
+          </select>
+        </div>
+        <div id="params-row" class="params-row"></div>
+        <div class="field-group" style="justify-content:flex-end;">
+          <div class="field-label">&nbsp;</div>
+          <button class="btn-send" id="btn-send" disabled onclick="sendAction()">Send ▶</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Observation log -->
+    <div class="log-panel" id="log-panel">
+      <div class="log-empty" id="log-empty">
+        <div class="log-empty-icon">📋</div>
+        <div>No observations yet.</div>
+        <div style="margin-top:6px;font-size:12px;">Select a task and click <strong>Start Episode</strong>.</div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const SERVER = (location.protocol === 'file:')
+  ? 'ws://localhost:7860/ws'
+  : `ws://${location.host}/ws`;
+let ws = null;
+let selectedTask = 'task_easy';
+let episodeActive = false;
+let stepNumber = 0;
+let maxSteps = 0;
+
+// ── Action parameter schemas ───────────────────────────────────────────────
+const ACTION_SCHEMA = {
+  get_patient_info:       { required: ['patient_id'],                              optional: [] },
+  search_doctors:         { required: ['department'],                              optional: ['date'] },
+  check_availability:     { required: ['doctor_id'],                               optional: ['date'] },
+  book_appointment:       { required: ['doctor_id', 'patient_id', 'slot_id'],     optional: ['urgency', 'appointment_type'] },
+  cancel_appointment:     { required: ['appointment_id'],                          optional: [] },
+  reschedule_appointment: { required: ['appointment_id', 'new_slot_id'],           optional: [] },
+  list_departments:       { required: [],                                          optional: [] },
+  get_appointment_details:{ required: ['appointment_id'],                          optional: [] },
+  get_doctor_schedule:    { required: ['doctor_id'],                               optional: [] },
+  get_working_hours:      { required: ['doctor_id'],                               optional: [] },
+  verify_insurance:       { required: ['patient_id', 'department'],               optional: [] },
+  check_waitlist:         { required: [],                                          optional: ['department', 'patient_id'] },
+  add_to_waitlist:        { required: ['patient_id', 'department'],               optional: ['preferred_doctor_id'] },
+  request_referral:       { required: ['patient_id', 'referring_doctor_id'],      optional: [] },
+  request_preauth:        { required: ['patient_id', 'department'],               optional: [] },
+  check_preauth_status:   { required: ['patient_id', 'department'],               optional: [] },
+  check_waitlist_offers:  { required: [],                                          optional: ['patient_id'] },
+  accept_waitlist_offer:  { required: ['patient_id'],                              optional: [] },
+  finish:                 { required: [],                                          optional: [] },
+};
+
+const PARAM_HINTS = {
+  patient_id: 'e.g. P001',
+  doctor_id: 'e.g. D001',
+  slot_id: 'e.g. D001-0401-09',
+  new_slot_id: 'e.g. D001-0401-10',
+  appointment_id: 'e.g. APT-101',
+  department: 'e.g. cardiology',
+  date: 'e.g. 2026-04-01',
+  urgency: 'routine|urgent|emergency',
+  appointment_type: 'consultation|follow_up|procedure',
+  referring_doctor_id: 'e.g. D009',
+  preferred_doctor_id: 'e.g. D003',
+};
+
+// ── WebSocket ──────────────────────────────────────────────────────────────
+function connect() {
+  setWsStatus('connecting');
+  ws = new WebSocket(SERVER);
+
+  ws.onopen = () => {
+    setWsStatus('connected');
+    document.getElementById('btn-start').disabled = false;
+  };
+
+  ws.onclose = () => {
+    setWsStatus('disconnected');
+    episodeActive = false;
+    document.getElementById('btn-start').disabled = true;
+    document.getElementById('btn-send').disabled = true;
+    // Reconnect after 3s
+    setTimeout(connect, 3000);
+  };
+
+  ws.onerror = () => setWsStatus('error');
+
+  ws.onmessage = (evt) => {
+    let msg;
+    try { msg = JSON.parse(evt.data); } catch { return; }
+    handleMessage(msg);
+  };
+}
+
+function setWsStatus(status) {
+  const dot = document.getElementById('ws-dot');
+  const label = document.getElementById('ws-label');
+  dot.className = 'ws-dot';
+  if (status === 'connected')    { dot.classList.add('connected'); label.textContent = 'Connected'; }
+  else if (status === 'error')   { dot.classList.add('error');     label.textContent = 'Error'; }
+  else if (status === 'disconnected') { label.textContent = 'Disconnected'; }
+  else { label.textContent = 'Connecting…'; }
+}
+
+// ── Message handling ───────────────────────────────────────────────────────
+function handleMessage(msg) {
+  if (msg.type === 'observation') {
+    const obs = msg.data;
+    stepNumber = obs.step_number ?? stepNumber;
+    maxSteps = obs.max_steps ?? maxSteps;
+    updateStats(obs);
+
+    if (obs.done) {
+      addDoneEntry(obs);
+      episodeActive = false;
+      document.getElementById('btn-send').disabled = true;
+    } else if (stepNumber === 0) {
+      // Reset response
+      addLogEntry('reset', 'Episode Started', obs, 'entry-reset');
+      document.getElementById('prompt-box').textContent = obs.message || '';
+      document.getElementById('prompt-box').classList.remove('prompt-empty');
+      episodeActive = true;
+      document.getElementById('btn-send').disabled = false;
+    } else {
+      const cls = obs.status === 'error' ? 'entry-error' : obs.status === 'warning' ? 'entry-warning' : 'entry-success';
+      addLogEntry('step', obs.status, obs, cls, stepNumber);
+    }
+  } else if (msg.type === 'error') {
+    addLogEntry('error', 'Error', { message: msg.data?.message || JSON.stringify(msg.data) }, 'entry-error');
+  }
+}
+
+// ── UI Updates ─────────────────────────────────────────────────────────────
+function updateStats(obs) {
+  const step = obs.step_number ?? stepNumber;
+  const max = obs.max_steps ?? maxSteps;
+  const reward = obs.reward;
+  const booked = obs.data?.booked_count ?? obs.data?.appointments?.filter(a => a.status === 'scheduled')?.length ?? '—';
+
+  document.getElementById('stat-step').textContent = step !== undefined ? step : '—';
+  document.getElementById('stat-max').textContent = max || '—';
+  document.getElementById('stat-score').textContent = reward != null ? reward.toFixed(2) : '—';
+  document.getElementById('stat-appts').textContent = booked;
+
+  if (max > 0) {
+    const pct = Math.min(100, Math.round((step / max) * 100));
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-label').textContent = `Step ${step} / ${max} (${pct}%)`;
+  }
+}
+
+function addLogEntry(type, label, obs, colorClass, step) {
+  const empty = document.getElementById('log-empty');
+  if (empty) empty.remove();
+
+  const panel = document.getElementById('log-panel');
+  const el = document.createElement('div');
+  el.className = 'log-entry';
+
+  const stepLabel = step != null ? `#${step}` : type === 'reset' ? 'RESET' : '';
+  const actionType = window._lastActionType || label;
+  const statusText = obs.status || label;
+
+  el.innerHTML = `
+    <div class="log-entry-header ${colorClass}" onclick="toggleEntry(this)">
+      <span class="entry-step">${stepLabel}</span>
+      <span class="entry-action">${type === 'reset' ? '🔄 Episode Reset' : '⚡ ' + actionType}</span>
+      <span class="entry-status">${statusText}</span>
+      <span class="entry-toggle">▼</span>
+    </div>
+    <div class="log-entry-body open">
+      <div class="entry-message">${escHtml(obs.message || '')}</div>
+      ${obs.data && Object.keys(obs.data).length ? `<div class="entry-data">${escHtml(JSON.stringify(obs.data, null, 2))}</div>` : ''}
+    </div>
+  `;
+
+  panel.appendChild(el);
+  el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+
+function addDoneEntry(obs) {
+  const empty = document.getElementById('log-empty');
+  if (empty) empty.remove();
+
+  const panel = document.getElementById('log-panel');
+  const score = obs.reward != null ? (obs.reward * 100).toFixed(0) : '?';
+  const grade = getGrade(obs.reward);
+
+  const el = document.createElement('div');
+  el.innerHTML = `
+    <div class="score-banner">
+      <div style="font-size:13px;opacity:.8;margin-bottom:4px;">Episode Complete</div>
+      <div class="score-big">${score}%</div>
+      <div class="score-sub">${grade} · ${stepNumber} steps used · ${maxSteps} max</div>
+    </div>
+  `;
+  panel.appendChild(el);
+
+  addLogEntry('done', 'Done', obs, 'entry-done', stepNumber);
+  el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+
+function getGrade(reward) {
+  if (reward == null) return 'Unknown';
+  if (reward >= 0.9) return '🏆 Excellent';
+  if (reward >= 0.7) return '✅ Good';
+  if (reward >= 0.5) return '⚠️ Partial';
+  return '❌ Poor';
+}
+
+function toggleEntry(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.entry-toggle');
+  body.classList.toggle('open');
+  toggle.textContent = body.classList.contains('open') ? '▼' : '▶';
+}
+
+// ── Actions ────────────────────────────────────────────────────────────────
+function startEpisode() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  // Clear log
+  const panel = document.getElementById('log-panel');
+  panel.innerHTML = '';
+  // Reset stats
+  stepNumber = 0;
+  updateStats({ step_number: 0, max_steps: maxSteps, reward: 0, data: {} });
+  document.getElementById('stat-score').textContent = '0.00';
+  document.getElementById('stat-appts').textContent = '0';
+  document.getElementById('prompt-box').innerHTML = '<span class="prompt-empty">Loading…</span>';
+
+  ws.send(JSON.stringify({
+    type: 'reset',
+    data: { task_id: selectedTask }
+  }));
+}
+
+function sendAction() {
+  if (!ws || ws.readyState !== WebSocket.OPEN || !episodeActive) return;
+  const actionType = document.getElementById('action-type-select').value;
+  if (!actionType) return;
+
+  const schema = ACTION_SCHEMA[actionType] || { required: [], optional: [] };
+  const params = {};
+  const allFields = [...schema.required, ...schema.optional];
+
+  for (const field of allFields) {
+    const input = document.getElementById('param-' + field);
+    if (input && input.value.trim()) {
+      params[field] = input.value.trim();
+    }
+  }
+
+  // Validate required
+  for (const f of schema.required) {
+    if (!params[f]) {
+      alert(`Required parameter missing: ${f}`);
+      return;
+    }
+  }
+
+  window._lastActionType = actionType;
+
+  ws.send(JSON.stringify({
+    type: 'step',
+    data: { action_type: actionType, parameters: params }
+  }));
+
+  // Disable send until response
+  document.getElementById('btn-send').disabled = true;
+  setTimeout(() => {
+    if (episodeActive) document.getElementById('btn-send').disabled = false;
+  }, 800);
+}
+
+function renderParams() {
+  const actionType = document.getElementById('action-type-select').value;
+  const container = document.getElementById('params-row');
+  container.innerHTML = '';
+
+  if (!actionType) return;
+  const schema = ACTION_SCHEMA[actionType] || { required: [], optional: [] };
+
+  for (const field of schema.required) {
+    container.appendChild(makeParamField(field, false));
+  }
+  for (const field of schema.optional) {
+    container.appendChild(makeParamField(field, true));
+  }
+}
+
+function makeParamField(name, optional) {
+  const div = document.createElement('div');
+  div.className = 'field-group';
+  div.innerHTML = `
+    <div class="field-label">${name}${optional ? ' <span class="optional">(opt)</span>' : ''}</div>
+    <input type="text" id="param-${name}" class="param-input"
+           placeholder="${PARAM_HINTS[name] || ''}" />
+  `;
+  return div;
+}
+
+// ── Task selection ─────────────────────────────────────────────────────────
+document.getElementById('task-cards').addEventListener('click', (e) => {
+  const card = e.target.closest('.task-card');
+  if (!card) return;
+  document.querySelectorAll('.task-card').forEach(c => c.classList.remove('active'));
+  card.classList.add('active');
+  selectedTask = card.dataset.id;
+});
+
+document.getElementById('btn-start').addEventListener('click', startEpisode);
+
+// ── Key shortcut: Enter to send ────────────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.ctrlKey) {
+    const btn = document.getElementById('btn-send');
+    if (!btn.disabled) sendAction();
+  }
+});
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+connect();
+</script>
+</body>
+</html>

@@ -21,7 +21,14 @@ app = create_app(
 )
 
 from fastapi import HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+# Serve frontend
+_FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+if _FRONTEND_DIR.exists():
+    app.mount("/frontend", StaticFiles(directory=str(_FRONTEND_DIR)), name="frontend")
 
 
 class TaskInfo(BaseModel):
@@ -52,6 +59,12 @@ ACTION_SCHEMAS = [
     ActionSchema(action_type="check_waitlist", description="View waitlist for a department", required_params=[], optional_params=["department", "patient_id"]),
     ActionSchema(action_type="add_to_waitlist", description="Add patient to department waitlist", required_params=["patient_id", "department"], optional_params=["preferred_doctor_id"]),
     ActionSchema(action_type="get_doctor_schedule", description="Get full doctor schedule", required_params=["doctor_id"], optional_params=[]),
+    ActionSchema(action_type="get_working_hours", description="Get doctor's shift schedule and working days", required_params=["doctor_id"], optional_params=[]),
+    ActionSchema(action_type="request_referral", description="Get a GP referral for a patient before specialist booking", required_params=["patient_id", "referring_doctor_id"], optional_params=[]),
+    ActionSchema(action_type="request_preauth", description="Request insurance pre-authorization for a department", required_params=["patient_id", "department"], optional_params=[]),
+    ActionSchema(action_type="check_preauth_status", description="Check pre-authorization status for a patient and department", required_params=["patient_id", "department"], optional_params=[]),
+    ActionSchema(action_type="check_waitlist_offers", description="Check for slot offers triggered by cancellations", required_params=[], optional_params=["patient_id"]),
+    ActionSchema(action_type="accept_waitlist_offer", description="Accept a waitlist slot offer and book the appointment", required_params=["patient_id"], optional_params=[]),
     ActionSchema(action_type="finish", description="Signal task completion -- call when all goals are met", required_params=[], optional_params=[]),
 ]
 
@@ -79,10 +92,19 @@ def list_tasks():
     }
 
 
+@app.get("/app", tags=["Frontend"], include_in_schema=False)
+def serve_frontend():
+    """Serve the hospital scheduler frontend UI."""
+    html_path = _FRONTEND_DIR / "index.html"
+    if html_path.exists():
+        return FileResponse(str(html_path), media_type="text/html")
+    return {"error": "Frontend not found"}
+
+
 @app.get("/", tags=["Health"])
 def health_check():
     """Health check endpoint — required by hackathon validator."""
-    return {"status": "ok", "name": "hospital_scheduler", "version": "2.0.0"}
+    return {"status": "ok", "name": "hospital_scheduler", "version": "2.1.0"}
 
 
 @app.get("/grader", tags=["Environment Info"])
@@ -172,11 +194,15 @@ def _get_heuristic_sequences():
             ("book_appointment", {"doctor_id": "D001", "patient_id": "P005", "slot_id": "D001-0402-09"}),
         ],
         "task_expert": [
-            ("get_patient_info", {"patient_id": "P004"}),
-            ("verify_insurance", {"patient_id": "P004", "department": "orthopedics"}),
-            ("verify_insurance", {"patient_id": "P004", "department": "general_medicine"}),
+            ("get_patient_info", {"patient_id": "P002"}),
+            ("verify_insurance", {"patient_id": "P002", "department": "orthopedics"}),
             ("search_doctors", {"department": "general_medicine", "date": "2026-04-01"}),
-            ("book_appointment", {"doctor_id": "D009", "patient_id": "P004", "slot_id": "D009-0401-11"}),
+            ("request_referral", {"patient_id": "P002", "referring_doctor_id": "D009"}),
+            ("request_preauth", {"patient_id": "P002", "department": "orthopedics"}),
+            ("search_doctors", {"department": "orthopedics", "date": "2026-04-01"}),
+            ("check_availability", {"doctor_id": "D003", "date": "2026-04-01"}),
+            # D003-0401-09 is blocked by APT-101; use next available slot
+            ("book_appointment", {"doctor_id": "D003", "patient_id": "P002", "slot_id": "D003-0401-14"}),
             ("get_patient_info", {"patient_id": "P009"}),
             ("get_appointment_details", {"appointment_id": "APT-404"}),
             ("verify_insurance", {"patient_id": "P009", "department": "general_medicine"}),
@@ -195,9 +221,11 @@ def _get_heuristic_sequences():
             ("book_appointment", {"doctor_id": "D012", "patient_id": "P007", "slot_id": "D012-0401-11", "urgency": "urgent"}),
             ("get_patient_info", {"patient_id": "P010"}),
             ("check_waitlist", {"department": "neurology"}),
+            # Cancel APT-505 (neurology slot) to trigger waitlist notification for P010
+            ("cancel_appointment", {"appointment_id": "APT-505"}),
+            ("check_waitlist_offers", {"patient_id": "P010"}),
             ("verify_insurance", {"patient_id": "P010", "department": "neurology"}),
-            ("search_doctors", {"department": "neurology", "date": "2026-04-01"}),
-            ("book_appointment", {"doctor_id": "D007", "patient_id": "P010", "slot_id": "D007-0401-14"}),
+            ("accept_waitlist_offer", {"patient_id": "P010"}),
             ("get_patient_info", {"patient_id": "P006"}),
             ("verify_insurance", {"patient_id": "P006", "department": "dermatology"}),
             ("search_doctors", {"department": "dermatology", "date": "2026-04-01"}),

@@ -1,21 +1,24 @@
 {
   "task_id": "task_expert",
-  "prompt": "Two patients at CrestView Medical Center need appointments, but both have insurance complications. You must verify coverage BEFORE booking.\n\n1. Patient P004 (Sarah Thompson, age 28) -- Symptoms: back pain and stiffness. Her insurance is VeriCare. She originally wanted an orthopedics appointment, but verify her insurance first. If her plan has issues, find an alternative -- either a department her insurance covers or a different approach.\n\n2. Patient P009 (Lisa Nakamura, age 35) -- Symptoms: persistent cough, fatigue, and weight loss. She had a general checkup (appointment APT-404) where she was referred for specialist follow-up. Her insurance is GuardianPlan. Review her referral appointment notes, then find an appropriate specialist who accepts her insurance.\n\nYou must:\n1. Look up each patient's records and symptoms\n2. Verify insurance coverage BEFORE booking\n3. If insurance doesn't cover a department, find an alternative solution\n4. Check referral details for P009 before booking her specialist\n5. Ensure all booked doctors accept the patient's insurance",
-  "max_steps": 20,
+  "prompt": "Two patients at CrestView Medical Center need appointments, but both have insurance complications. You must verify coverage BEFORE booking and follow referral and pre-authorization rules.\n\n1. Patient P002 (Jane Martinez, age 32) -- Symptoms: knee pain and swelling. Her insurance is ClearPath. ClearPath requires a GP referral before booking specialists, and also requires pre-authorization for orthopedics appointments. You must: (a) get patient info, (b) verify insurance, (c) get a GP referral using request_referral with a General Medicine doctor, (d) request pre-authorization for orthopedics using request_preauth, then (e) book her orthopedics appointment.\n\n2. Patient P009 (Lisa Nakamura, age 35) -- Symptoms: persistent cough, fatigue, and weight loss. She had a general checkup (appointment APT-404) where she was referred for specialist follow-up. Her insurance is GuardianPlan (no referral required). Review her referral appointment notes, then find an appropriate specialist who accepts her insurance.\n\nYou must:\n1. Look up each patient's records and symptoms\n2. Verify insurance coverage BEFORE booking\n3. For P002 (ClearPath): get a GP referral first, then request pre-authorization for orthopedics\n4. Check referral details for P009 before booking her specialist\n5. Ensure all booked doctors accept the patient's insurance\n6. Check each doctor's working hours before booking to ensure the slot is within their shift",
+  "max_steps": 25,
   "difficulty": "expert",
   "initial_appointments": [
     "APT-404"
   ],
   "target_patients": [
-    "P004",
+    "P002",
     "P009"
   ],
   "constraints": {
     "insurance_check_required": true,
-    "p004_insurance_expired": true,
-    "p004_fallback_department": "general_medicine",
+    "p002_requires_referral": true,
+    "p002_requires_preauth": ["orthopedics"],
+    "p002_insurance": "ClearPath",
+    "p002_target_department": "orthopedics",
     "p009_needs_specialist": true,
     "p009_referral_from": "APT-404",
-    "goal": "insurance_aware_booking"
+    "p009_insurance": "GuardianPlan",
+    "goal": "insurance_referral_preauth_booking"
   }
 }

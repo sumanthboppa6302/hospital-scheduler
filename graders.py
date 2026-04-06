@@ -172,12 +172,18 @@ def grade_task_expert(env: HospitalEnv) -> float:
 
     booked_new = {a.patient_id for a in env.appointments if a.status == AppointmentStatus.SCHEDULED and a.appointment_id.startswith("APT-5")}
     if {"P004", "P009"}.issubset(booked_new):
-        score += 0.15
-    elif len(booked_new & {"P004", "P009"}) >= 1:
         score += 0.05
+    elif len(booked_new & {"P004", "P009"}) >= 1:
+        score += 0.02
 
     all_slots = [a.slot.slot_id for a in env.appointments if a.status == AppointmentStatus.SCHEDULED]
     if len(all_slots) == len(set(all_slots)):
+        score += 0.05
+
+    # Reward real-world referral and pre-auth workflows
+    if any(a.action_type == ActionType.REQUEST_REFERRAL for a in actions):
+        score += 0.05
+    if any(a.action_type in (ActionType.REQUEST_PREAUTH, ActionType.CHECK_PREAUTH_STATUS) for a in actions):
         score += 0.05
 
     if env.step_number <= 15:
@@ -226,6 +232,10 @@ def grade_task_nightmare(env: HospitalEnv) -> float:
         score += 0.05
 
     if any(a.action_type == ActionType.CHECK_WAITLIST for a in actions):
+        score += 0.05
+    if any(a.action_type == ActionType.CHECK_WAITLIST_OFFERS for a in actions):
+        score += 0.05
+    if any(a.action_type == ActionType.ACCEPT_WAITLIST_OFFER for a in actions):
         score += 0.05
 
     if p010_appt:

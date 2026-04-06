@@ -29,6 +29,7 @@ INSURANCE_PLANS: dict[str, InsurancePlan] = {
         covered_departments=["general_medicine", "orthopedics", "dermatology"],
         copay=40.0,
         requires_referral=True,
+        requires_preauth=["orthopedics"],
     ),
     "UnionCare": InsurancePlan(
         plan_name="UnionCare Plus",
@@ -61,6 +62,7 @@ INSURANCE_PLANS: dict[str, InsurancePlan] = {
         covered_departments=["general_medicine", "emergency", "pediatrics"],
         copay=5.0,
         requires_referral=True,
+        requires_preauth=["emergency"],
     ),
     "GuardianPlan": InsurancePlan(
         plan_name="GuardianPlan Select",
@@ -78,6 +80,8 @@ DOCTORS: list[Doctor] = [
         department=Department.CARDIOLOGY, specialization="Interventional Cardiology",
         rating=4.8, accepted_insurance=["AzureShield", "UnionCare", "FederalMed", "GuardianPlan"],
         max_patients_per_day=8, on_leave_dates=["2026-04-05"],
+        working_hours=("09:00", "17:00"),
+        working_days=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
         availability=[
             TimeSlot(slot_id="D001-0401-09", date="2026-04-01", start_time="09:00", end_time="09:30"),
             TimeSlot(slot_id="D001-0401-10", date="2026-04-01", start_time="10:00", end_time="10:30"),
@@ -94,6 +98,8 @@ DOCTORS: list[Doctor] = [
         department=Department.CARDIOLOGY, specialization="Electrophysiology",
         rating=4.5, accepted_insurance=["AzureShield", "ClearPath", "FederalMed"],
         max_patients_per_day=6,
+        working_hours=("09:00", "17:00"),
+        working_days=["Tuesday", "Wednesday", "Thursday", "Friday"],
         availability=[
             TimeSlot(slot_id="D002-0401-11", date="2026-04-01", start_time="11:00", end_time="11:30"),
             TimeSlot(slot_id="D002-0401-15", date="2026-04-01", start_time="15:00", end_time="15:30"),
@@ -106,6 +112,8 @@ DOCTORS: list[Doctor] = [
         department=Department.ORTHOPEDICS, specialization="Sports Medicine",
         rating=4.7, accepted_insurance=["AzureShield", "ClearPath", "VeriCare", "FederalMed", "GuardianPlan"],
         max_patients_per_day=8,
+        working_hours=("09:00", "17:00"),
+        working_days=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
         availability=[
             TimeSlot(slot_id="D003-0401-09", date="2026-04-01", start_time="09:00", end_time="09:30"),
             TimeSlot(slot_id="D003-0401-14", date="2026-04-01", start_time="14:00", end_time="14:30"),
@@ -120,6 +128,8 @@ DOCTORS: list[Doctor] = [
         department=Department.ORTHOPEDICS, specialization="Joint Replacement",
         rating=4.3, accepted_insurance=["AzureShield", "FederalMed", "UnionCare"],
         max_patients_per_day=6,
+        working_hours=("09:00", "17:00"),
+        working_days=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
         availability=[
             TimeSlot(slot_id="D004-0401-10", date="2026-04-01", start_time="10:00", end_time="10:30"),
             TimeSlot(slot_id="D004-0402-14", date="2026-04-02", start_time="14:00", end_time="14:30"),
@@ -131,6 +141,8 @@ DOCTORS: list[Doctor] = [
         department=Department.DERMATOLOGY, specialization="Clinical Dermatology",
         rating=4.6, accepted_insurance=["AzureShield", "ClearPath", "GuardianPlan"],
         max_patients_per_day=10,
+        working_hours=("09:00", "17:00"),
+        working_days=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
         availability=[
             TimeSlot(slot_id="D005-0401-09", date="2026-04-01", start_time="09:00", end_time="09:30"),
             TimeSlot(slot_id="D005-0401-11", date="2026-04-01", start_time="11:00", end_time="11:30"),
@@ -143,6 +155,8 @@ DOCTORS: list[Doctor] = [
         department=Department.DERMATOLOGY, specialization="Cosmetic Dermatology",
         rating=4.2, accepted_insurance=["AzureShield", "GuardianPlan"],
         max_patients_per_day=8,
+        working_hours=("10:00", "18:00"),
+        working_days=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
         availability=[
             TimeSlot(slot_id="D006-0401-14", date="2026-04-01", start_time="14:00", end_time="14:30"),
             TimeSlot(slot_id="D006-0402-09", date="2026-04-02", start_time="09:00", end_time="09:30"),
@@ -154,6 +168,8 @@ DOCTORS: list[Doctor] = [
         department=Department.NEUROLOGY, specialization="Neurophysiology",
         rating=4.9, accepted_insurance=["AzureShield", "UnionCare", "FederalMed", "GuardianPlan"],
         max_patients_per_day=6,
+        working_hours=("09:00", "17:00"),
+        working_days=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
         availability=[
             TimeSlot(slot_id="D007-0401-09", date="2026-04-01", start_time="09:00", end_time="09:30"),
             TimeSlot(slot_id="D007-0401-14", date="2026-04-01", start_time="14:00", end_time="14:30"),
@@ -167,6 +183,8 @@ DOCTORS: list[Doctor] = [
         department=Department.NEUROLOGY, specialization="Stroke & Cerebrovascular",
         rating=4.4, accepted_insurance=["UnionCare", "FederalMed", "StateWell"],
         max_patients_per_day=6,
+        working_hours=("09:00", "17:00"),
+        working_days=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
         availability=[
             TimeSlot(slot_id="D008-0401-10", date="2026-04-01", start_time="10:00", end_time="10:30"),
             TimeSlot(slot_id="D008-0402-11", date="2026-04-02", start_time="11:00", end_time="11:30"),
@@ -178,6 +196,8 @@ DOCTORS: list[Doctor] = [
         department=Department.GENERAL_MEDICINE, specialization="Internal Medicine",
         rating=4.6, accepted_insurance=["AzureShield", "ClearPath", "UnionCare", "VeriCare", "FederalMed", "StateWell", "GuardianPlan"],
         max_patients_per_day=12,
+        working_hours=("09:00", "17:00"),
+        working_days=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
         availability=[
             TimeSlot(slot_id="D009-0401-09", date="2026-04-01", start_time="09:00", end_time="09:30"),
             TimeSlot(slot_id="D009-0401-11", date="2026-04-01", start_time="11:00", end_time="11:30"),
@@ -191,6 +211,8 @@ DOCTORS: list[Doctor] = [
         department=Department.GENERAL_MEDICINE, specialization="Family Medicine",
         rating=4.1, accepted_insurance=["AzureShield", "ClearPath", "VeriCare", "StateWell"],
         max_patients_per_day=10,
+        working_hours=("09:00", "17:00"),
+        working_days=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
         availability=[
             TimeSlot(slot_id="D010-0401-10", date="2026-04-01", start_time="10:00", end_time="10:30"),
             TimeSlot(slot_id="D010-0402-14", date="2026-04-02", start_time="14:00", end_time="14:30"),
@@ -202,6 +224,8 @@ DOCTORS: list[Doctor] = [
         department=Department.EMERGENCY, specialization="Emergency Medicine",
         rating=4.7, accepted_insurance=["AzureShield", "UnionCare", "FederalMed", "StateWell", "GuardianPlan"],
         max_patients_per_day=20,
+        working_hours=("08:00", "20:00"),
+        working_days=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
         availability=[
             TimeSlot(slot_id="D011-0401-08", date="2026-04-01", start_time="08:00", end_time="08:30"),
             TimeSlot(slot_id="D011-0401-12", date="2026-04-01", start_time="12:00", end_time="12:30"),
@@ -215,6 +239,8 @@ DOCTORS: list[Doctor] = [
         department=Department.PEDIATRICS, specialization="General Pediatrics",
         rating=4.8, accepted_insurance=["AzureShield", "UnionCare", "StateWell", "GuardianPlan"],
         max_patients_per_day=10,
+        working_hours=("09:00", "17:00"),
+        working_days=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
         availability=[
             TimeSlot(slot_id="D012-0401-09", date="2026-04-01", start_time="09:00", end_time="09:30"),
             TimeSlot(slot_id="D012-0401-11", date="2026-04-01", start_time="11:00", end_time="11:30"),
@@ -426,5 +452,6 @@ def check_insurance_coverage(patient_id: str, department: str) -> dict:
         "provider": plan.provider,
         "copay": plan.copay,
         "requires_referral": plan.requires_referral,
+        "requires_preauth": plan.requires_preauth,
         "plan_status": "active",
     }

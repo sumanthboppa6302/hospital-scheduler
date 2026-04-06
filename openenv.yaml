@@ -8,11 +8,11 @@ port: 7860
 description: >
   Hospital appointment scheduling environment where AI agents must review patient
   symptoms, determine the correct department, verify insurance, and book appointments.
-  Features 7 departments, 12 doctors, 10 patients, insurance traps, emergency triage,
-  and waitlist management. Agents never see the raw database -- they discover everything
-  through actions.
+  Features 7 departments, 12 doctors, 10 patients, doctor shift schedules, referral
+  requirements, insurance pre-authorization, appointment types with durations, and
+  cancellation-triggered waitlist notifications. 19 actions total.
 
-version: "2.0.0"
+version: "2.1.0"
 authors:
   - name: Sumanth Boppa
 
@@ -29,6 +29,12 @@ actions:
   - check_waitlist
   - add_to_waitlist
   - get_doctor_schedule
+  - get_working_hours
+  - request_referral
+  - request_preauth
+  - check_preauth_status
+  - check_waitlist_offers
+  - accept_waitlist_offer
   - finish
 
 tasks:

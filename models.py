@@ -44,6 +44,12 @@ class ActionType(str, Enum):
     CHECK_WAITLIST = "check_waitlist"
     ADD_TO_WAITLIST = "add_to_waitlist"
     GET_DOCTOR_SCHEDULE = "get_doctor_schedule"
+    GET_WORKING_HOURS = "get_working_hours"
+    REQUEST_REFERRAL = "request_referral"
+    REQUEST_PREAUTH = "request_preauth"
+    CHECK_PREAUTH_STATUS = "check_preauth_status"
+    CHECK_WAITLIST_OFFERS = "check_waitlist_offers"
+    ACCEPT_WAITLIST_OFFER = "accept_waitlist_offer"
     FINISH = "finish"
 
 
@@ -69,6 +75,19 @@ class InsuranceStatus(str, Enum):
     NOT_COVERED = "not_covered"
 
 
+class AppointmentType(str, Enum):
+    FOLLOW_UP = "follow_up"
+    CONSULTATION = "consultation"
+    PROCEDURE = "procedure"
+
+
+APPOINTMENT_TYPE_DURATIONS: dict[str, int] = {
+    "follow_up": 15,
+    "consultation": 30,
+    "procedure": 60,
+}
+
+
 # ---------------------------------------------------------------------------
 # Domain models
 # ---------------------------------------------------------------------------
@@ -91,6 +110,8 @@ class Doctor(BaseModel):
     accepted_insurance: list[str] = []
     max_patients_per_day: int = 8
     on_leave_dates: list[str] = []
+    working_hours: tuple[str, str] = ("09:00", "17:00")
+    working_days: list[str] = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 
 
 class Patient(BaseModel):
@@ -112,6 +133,7 @@ class InsurancePlan(BaseModel):
     covered_departments: list[str] = []
     copay: float = 0.0
     requires_referral: bool = False
+    requires_preauth: list[str] = []
 
 
 class WaitlistEntry(BaseModel):
@@ -121,6 +143,7 @@ class WaitlistEntry(BaseModel):
     date_added: str = ""
     urgency: UrgencyLevel = UrgencyLevel.ROUTINE
     notes: str = ""
+    notification_status: str = "none"
 
 
 class Appointment(BaseModel):
@@ -132,6 +155,8 @@ class Appointment(BaseModel):
     notes: str = ""
     urgency: UrgencyLevel = UrgencyLevel.ROUTINE
     insurance_verified: bool = False
+    appointment_type: str = "consultation"
+    preauth_status: str = "not_required"
 
 
 # ---------------------------------------------------------------------------
@@ -140,7 +165,7 @@ class Appointment(BaseModel):
 
 class HospitalAction(OpenEnvAction):
     """Action the agent sends to the hospital environment."""
-    action_type: str = Field(..., description="One of: search_doctors, check_availability, book_appointment, cancel_appointment, reschedule_appointment, get_patient_info, list_departments, get_appointment_details, verify_insurance, check_waitlist, add_to_waitlist, get_doctor_schedule")
+    action_type: str = Field(..., description="One of: search_doctors, check_availability, book_appointment, cancel_appointment, reschedule_appointment, get_patient_info, list_departments, get_appointment_details, verify_insurance, check_waitlist, add_to_waitlist, get_doctor_schedule, get_working_hours, request_referral, request_preauth, check_preauth_status, check_waitlist_offers, accept_waitlist_offer, finish")
     parameters: Dict[str, Any] = Field(default_factory=dict, description="Action-specific parameters as key-value pairs")
 
 

@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import copy
+import datetime
 import json
 from pathlib import Path
 from typing import Any
 
 from models import (
+    APPOINTMENT_TYPE_DURATIONS,
     ActionType,
     Appointment,
     AppointmentStatus,
@@ -82,6 +84,9 @@ class HospitalEnv:
         self.current_reward: float = 0.0
         self.doctors = copy.deepcopy(DOCTORS)
         self.insurance_verified: dict[str, dict] = {}
+        self.referrals_granted: set[str] = set()
+        self.preauth_approved: dict[str, set[str]] = {}
+        self.pending_offers: dict[str, dict] = {}
         self._consecutive_errors: int = 0
         self._repeated_actions: int = 0
         self._last_action_key: str = ""
@@ -108,6 +113,9 @@ class HospitalEnv:
         self.done = False
         self.current_reward = 0.0
         self.insurance_verified = {}
+        self.referrals_granted = set()
+        self.preauth_approved = {}
+        self.pending_offers = {}
         self._consecutive_errors = 0
         self._repeated_actions = 0
         self._last_action_key = ""
@@ -168,6 +176,12 @@ class HospitalEnv:
             ActionType.CHECK_WAITLIST: self._handle_check_waitlist,
             ActionType.ADD_TO_WAITLIST: self._handle_add_to_waitlist,
             ActionType.GET_DOCTOR_SCHEDULE: self._handle_get_doctor_schedule,
+            ActionType.GET_WORKING_HOURS: self._handle_get_working_hours,
+            ActionType.REQUEST_REFERRAL: self._handle_request_referral,
+            ActionType.REQUEST_PREAUTH: self._handle_request_preauth,
+            ActionType.CHECK_PREAUTH_STATUS: self._handle_check_preauth_status,
+            ActionType.CHECK_WAITLIST_OFFERS: self._handle_check_waitlist_offers,
+            ActionType.ACCEPT_WAITLIST_OFFER: self._handle_accept_waitlist_offer,
             ActionType.FINISH: self._handle_finish,
         }.get(action.action_type)
 
@@ -254,6 +268,10 @@ class HospitalEnv:
         patient_id = params.get("patient_id", "")
         slot_id = params.get("slot_id", "")
         urgency = params.get("urgency", "routine")
+        appointment_type = params.get("appointment_type", "consultation")
+        if appointment_type not in APPOINTMENT_TYPE_DURATIONS:
+            appointment_type = "consultation"
+
         doc = self._get_doctor(doctor_id)
         if doc is None:
             return Observation(status="error", message=f"Doctor '{doctor_id}' not found.", available_actions=ALL_ACTION_NAMES)
@@ -268,6 +286,34 @@ class HospitalEnv:
         if slot.date in doc.on_leave_dates:
             return Observation(status="error", message=f"{doc.name} is on leave on {slot.date}.", available_actions=ALL_ACTION_NAMES)
 
+        # Validate working day and hours
+        slot_date = datetime.date.fromisoformat(slot.date)
+        day_name = slot_date.strftime("%A")
+        if day_name not in doc.working_days:
+            return Observation(status="error", message=f"{doc.name} does not work on {day_name}s. Working days: {', '.join(doc.working_days)}.", available_actions=ALL_ACTION_NAMES)
+        if not (doc.working_hours[0] <= slot.start_time < doc.working_hours[1]):
+            return Observation(status="error", message=f"Slot at {slot.start_time} is outside {doc.name}'s working hours ({doc.working_hours[0]}-{doc.working_hours[1]}).", available_actions=ALL_ACTION_NAMES)
+
+        # Validate appointment duration fits in slot
+        required_minutes = APPOINTMENT_TYPE_DURATIONS[appointment_type]
+        slot_start_dt = datetime.datetime.strptime(slot.start_time, "%H:%M")
+        slot_end_dt = datetime.datetime.strptime(slot.end_time, "%H:%M")
+        slot_duration = int((slot_end_dt - slot_start_dt).total_seconds() / 60)
+        if required_minutes > slot_duration:
+            return Observation(status="error", message=f"'{appointment_type}' requires {required_minutes} min but slot {slot_id} is only {slot_duration} min ({slot.start_time}-{slot.end_time}).", available_actions=ALL_ACTION_NAMES)
+
+        # Referral gate: specialists require referral if insurance plan demands it
+        if doc.department != Department.GENERAL_MEDICINE:
+            plan = get_insurance_plan(patient.insurance)
+            if plan and plan.requires_referral and patient_id not in self.referrals_granted:
+                return Observation(status="error", message=f"{patient.name}'s insurance ({plan.plan_name}) requires a GP referral before booking {doc.department.value}. Use request_referral first.", available_actions=ALL_ACTION_NAMES)
+
+        # Pre-authorization gate
+        plan = get_insurance_plan(patient.insurance)
+        if plan and doc.department.value in plan.requires_preauth:
+            if doc.department.value not in self.preauth_approved.get(patient_id, set()):
+                return Observation(status="error", message=f"{patient.name}'s plan ({plan.plan_name}) requires pre-authorization for {doc.department.value}. Use request_preauth first.", available_actions=ALL_ACTION_NAMES)
+
         insurance_warning = ""
         if self.task_config and self.task_config.constraints.get("insurance_check_required"):
             if patient_id not in self.insurance_verified:
@@ -279,10 +325,15 @@ class HospitalEnv:
         except ValueError:
             urg = UrgencyLevel.ROUTINE
 
+        preauth_status = "not_required"
+        if plan and doc.department.value in plan.requires_preauth:
+            preauth_status = "approved"
+
         appt = Appointment(
             appointment_id=appt_id, patient_id=patient_id, doctor_id=doctor_id,
             slot=slot.model_copy(), status=AppointmentStatus.SCHEDULED,
             urgency=urg, insurance_verified=patient_id in self.insurance_verified,
+            appointment_type=appointment_type, preauth_status=preauth_status,
         )
         appt.slot.is_available = False
         self.appointments.append(appt)
@@ -296,7 +347,8 @@ class HospitalEnv:
             message=f"Appointment {appt_id} booked: {patient.name} with {doc.name} on {slot.date} at {slot.start_time}.{insurance_warning}",
             data={"appointment_id": appt_id, "patient_id": patient_id, "doctor_id": doctor_id, "doctor_name": doc.name,
                   "slot": {"slot_id": slot_id, "date": slot.date, "start_time": slot.start_time, "end_time": slot.end_time},
-                  "urgency": urg.value, "insurance_verified": patient_id in self.insurance_verified},
+                  "urgency": urg.value, "appointment_type": appointment_type, "duration_minutes": required_minutes,
+                  "insurance_verified": patient_id in self.insurance_verified, "preauth_status": preauth_status},
             available_actions=ALL_ACTION_NAMES,
         )
 
@@ -308,7 +360,28 @@ class HospitalEnv:
         appt.status = AppointmentStatus.CANCELLED
         self.booked_slots.discard(appt.slot.slot_id)
         self._mark_slot_available(appt.slot.slot_id)
-        return Observation(status="success", message=f"Appointment {appt_id} cancelled.", data={"appointment_id": appt_id, "status": "cancelled"}, available_actions=ALL_ACTION_NAMES)
+
+        # Notify waitlisted patients for the same department
+        doc = self._get_doctor(appt.doctor_id)
+        notified = []
+        if doc:
+            for entry in self.waitlist:
+                if entry.department == doc.department.value and entry.notification_status == "none":
+                    entry.notification_status = "notified"
+                    self.pending_offers[entry.patient_id] = {
+                        "slot_id": appt.slot.slot_id,
+                        "doctor_id": appt.doctor_id,
+                        "doctor_name": doc.name,
+                        "date": appt.slot.date,
+                        "start_time": appt.slot.start_time,
+                        "department": doc.department.value,
+                    }
+                    notified.append(entry.patient_id)
+
+        msg = f"Appointment {appt_id} cancelled."
+        if notified:
+            msg += f" Waitlisted patients notified of available slot: {notified}. Use check_waitlist_offers to view."
+        return Observation(status="success", message=msg, data={"appointment_id": appt_id, "status": "cancelled", "waitlist_notified": notified}, available_actions=ALL_ACTION_NAMES)
 
     def _handle_reschedule_appointment(self, params: dict[str, Any]) -> Observation:
         appt_id = params.get("appointment_id", "")
@@ -439,6 +512,117 @@ class HospitalEnv:
                                  "booked_appointments": booked, "available_slots": available, "on_leave_dates": doc.on_leave_dates,
                                  "max_patients_per_day": doc.max_patients_per_day, "accepted_insurance": doc.accepted_insurance},
                            available_actions=ALL_ACTION_NAMES)
+
+    def _handle_get_working_hours(self, params: dict[str, Any]) -> Observation:
+        doctor_id = params.get("doctor_id", "")
+        doc = self._get_doctor(doctor_id)
+        if doc is None:
+            return Observation(status="error", message=f"Doctor '{doctor_id}' not found.", available_actions=ALL_ACTION_NAMES)
+        return Observation(
+            status="success",
+            message=f"{doc.name} works {', '.join(doc.working_days)} from {doc.working_hours[0]} to {doc.working_hours[1]}.",
+            data={"doctor_id": doc.doctor_id, "doctor_name": doc.name, "working_days": doc.working_days,
+                  "working_hours_start": doc.working_hours[0], "working_hours_end": doc.working_hours[1],
+                  "on_leave_dates": doc.on_leave_dates},
+            available_actions=ALL_ACTION_NAMES,
+        )
+
+    def _handle_request_referral(self, params: dict[str, Any]) -> Observation:
+        patient_id = params.get("patient_id", "")
+        referring_doctor_id = params.get("referring_doctor_id", "")
+        patient = get_patient(patient_id)
+        if patient is None:
+            return Observation(status="error", message=f"Patient '{patient_id}' not found.", available_actions=ALL_ACTION_NAMES)
+        referring_doc = self._get_doctor(referring_doctor_id)
+        if referring_doc is None:
+            return Observation(status="error", message=f"Referring doctor '{referring_doctor_id}' not found.", available_actions=ALL_ACTION_NAMES)
+        if referring_doc.department != Department.GENERAL_MEDICINE:
+            return Observation(status="error", message=f"Referrals can only be issued by General Medicine doctors. {referring_doc.name} is in {referring_doc.department.value}.", available_actions=ALL_ACTION_NAMES)
+        self.referrals_granted.add(patient_id)
+        return Observation(
+            status="success",
+            message=f"Referral granted for {patient.name} by {referring_doc.name}. Patient may now book specialist appointments.",
+            data={"patient_id": patient_id, "patient_name": patient.name, "referred_by": referring_doctor_id, "referring_doctor_name": referring_doc.name},
+            available_actions=ALL_ACTION_NAMES,
+        )
+
+    def _handle_request_preauth(self, params: dict[str, Any]) -> Observation:
+        patient_id = params.get("patient_id", "")
+        department = params.get("department", "").lower().replace(" ", "_")
+        patient = get_patient(patient_id)
+        if patient is None:
+            return Observation(status="error", message=f"Patient '{patient_id}' not found.", available_actions=ALL_ACTION_NAMES)
+        plan = get_insurance_plan(patient.insurance)
+        if plan is None:
+            return Observation(status="error", message=f"No insurance plan found for patient {patient_id}.", available_actions=ALL_ACTION_NAMES)
+        if department not in plan.requires_preauth:
+            return Observation(status="success", message=f"{plan.plan_name} does not require pre-authorization for {department}.",
+                               data={"preauth_required": False, "department": department, "plan": plan.plan_name}, available_actions=ALL_ACTION_NAMES)
+        if patient_id not in self.preauth_approved:
+            self.preauth_approved[patient_id] = set()
+        self.preauth_approved[patient_id].add(department)
+        return Observation(
+            status="success",
+            message=f"Pre-authorization approved for {patient.name} ({plan.plan_name}) for {department}.",
+            data={"patient_id": patient_id, "department": department, "preauth_status": "approved", "plan": plan.plan_name},
+            available_actions=ALL_ACTION_NAMES,
+        )
+
+    def _handle_check_preauth_status(self, params: dict[str, Any]) -> Observation:
+        patient_id = params.get("patient_id", "")
+        department = params.get("department", "").lower().replace(" ", "_")
+        patient = get_patient(patient_id)
+        if patient is None:
+            return Observation(status="error", message=f"Patient '{patient_id}' not found.", available_actions=ALL_ACTION_NAMES)
+        plan = get_insurance_plan(patient.insurance)
+        requires = plan.requires_preauth if plan else []
+        approved = self.preauth_approved.get(patient_id, set())
+        if department in approved:
+            status_val = "approved"
+        elif department in requires:
+            status_val = "pending"
+        else:
+            status_val = "not_required"
+        return Observation(
+            status="success",
+            message=f"Pre-auth status for {patient.name} / {department}: {status_val}.",
+            data={"patient_id": patient_id, "department": department, "preauth_status": status_val,
+                  "departments_requiring_preauth": requires, "departments_approved": list(approved)},
+            available_actions=ALL_ACTION_NAMES,
+        )
+
+    def _handle_check_waitlist_offers(self, params: dict[str, Any]) -> Observation:
+        patient_id = params.get("patient_id", "")
+        if patient_id:
+            offers = {patient_id: self.pending_offers[patient_id]} if patient_id in self.pending_offers else {}
+        else:
+            offers = dict(self.pending_offers)
+        if not offers:
+            return Observation(status="success", message="No pending waitlist slot offers.", data={"offers": {}}, available_actions=ALL_ACTION_NAMES)
+        return Observation(
+            status="success",
+            message=f"Found {len(offers)} pending waitlist offer(s). Use accept_waitlist_offer to book.",
+            data={"offers": offers},
+            available_actions=ALL_ACTION_NAMES,
+        )
+
+    def _handle_accept_waitlist_offer(self, params: dict[str, Any]) -> Observation:
+        patient_id = params.get("patient_id", "")
+        if patient_id not in self.pending_offers:
+            return Observation(status="error", message=f"No pending waitlist offer for patient '{patient_id}'.", available_actions=ALL_ACTION_NAMES)
+        offer = self.pending_offers[patient_id]
+        book_obs = self._handle_book_appointment({
+            "doctor_id": offer["doctor_id"],
+            "patient_id": patient_id,
+            "slot_id": offer["slot_id"],
+            "urgency": "routine",
+        })
+        if book_obs.status == "success":
+            del self.pending_offers[patient_id]
+            for entry in self.waitlist:
+                if entry.patient_id == patient_id:
+                    entry.notification_status = "offer_accepted"
+        return book_obs
 
     def _handle_finish(self, params: dict[str, Any]) -> Observation:
         """Agent signals it has completed the task."""
