@@ -602,12 +602,21 @@ function setWsStatus(status) {
 // ── Message handling ───────────────────────────────────────────────────────
 function handleMessage(msg) {
   if (msg.type === 'observation') {
-    const obs = msg.data;
+    // OpenEnv wraps: { type, data: { observation, reward, done } }
+    const wrapper = msg.data;
+    const obs = wrapper.observation ?? wrapper;   // unwrap inner observation object
+    const done = wrapper.done ?? obs.done ?? false;
+    const reward = wrapper.reward ?? obs.reward ?? 0;
+
+    // Merge top-level reward/done into obs for display helpers
+    obs.done = done;
+    obs.reward = reward;
+
     stepNumber = obs.step_number ?? stepNumber;
     maxSteps = obs.max_steps ?? maxSteps;
     updateStats(obs);
 
-    if (obs.done) {
+    if (done) {
       addDoneEntry(obs);
       episodeActive = false;
       document.getElementById('btn-send').disabled = true;
