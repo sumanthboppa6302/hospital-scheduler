@@ -291,7 +291,7 @@ Respond with ONLY a valid JSON object, no explanation, no markdown:
 
 class AgentRunRequest(BaseModel):
     task_id: str
-    api_base: str = "https://api-inference.huggingface.co/v1"
+    api_base: str = "https://router.huggingface.co/v1"
     model_name: str = "meta-llama/Llama-3.3-70B-Instruct"
     api_key: Optional[str] = None
     max_steps: Optional[int] = None

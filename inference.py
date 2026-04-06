@@ -7,7 +7,7 @@ MANDATORY environment variables:
     HF_TOKEN       Your Hugging Face / API key.
 
 Usage:
-    export API_BASE_URL="https://api-inference.huggingface.co/v1"
+    export API_BASE_URL="https://router.huggingface.co/v1"
     export MODEL_NAME="meta-llama/Llama-3.3-70B-Instruct"
     export HF_TOKEN="hf_..."
     python inference.py
@@ -72,7 +72,7 @@ Respond with ONLY a valid JSON object, no explanation, no markdown:
 
 
 def get_llm_client() -> OpenAI:
-    api_base = os.environ.get("API_BASE_URL", "https://api-inference.huggingface.co/v1")
+    api_base = os.environ.get("API_BASE_URL", "https://router.huggingface.co/v1")
     hf_token = os.environ.get("HF_TOKEN", "")
     return OpenAI(base_url=api_base, api_key=hf_token)
 
