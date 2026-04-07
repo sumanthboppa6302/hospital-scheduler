@@ -227,7 +227,7 @@ def run_task(server_url: str, task_id: str, client: OpenAI, model: str) -> float
                 steps_used = step_i
                 break
 
-            step_reward = float(obs.get("reward", 0.0))
+            step_reward = max(0.01, min(0.99, float(obs.get("reward", 0.0))))
             done = bool(obs.get("done", False))
 
             # Treat env-level errors as non-null error field
@@ -265,12 +265,14 @@ def run_task(server_url: str, task_id: str, client: OpenAI, model: str) -> float
         except Exception:
             pass
 
+        # Clamp strictly inside (0, 1) — validator rejects exactly 0.0 or 1.0
+        score = max(0.01, min(0.99, score))
         print(f"\n  Score: {score:.4f} / 1.00   (steps used: {steps_used} / {max_steps})")
         success = score >= SUCCESS_THRESHOLD
 
     except Exception as exc:
         print(f"  [ERROR] {task_id}: {exc}")
-        score = 0.0
+        score = 0.01   # minimum non-zero score (never 0.0)
         success = False
 
     finally:

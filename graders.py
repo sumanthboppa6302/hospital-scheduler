@@ -12,17 +12,18 @@ if TYPE_CHECKING:
 
 def grade(env: HospitalEnv) -> float:
     if env.task_config is None:
-        return 0.0
-    grader = {
-        "task_easy": grade_task_easy,
-        "task_medium": grade_task_medium,
-        "task_hard": grade_task_hard,
-        "task_expert": grade_task_expert,
-        "task_nightmare": grade_task_nightmare,
-    }.get(env.task_config.task_id)
-    if grader is None:
-        return env.current_reward
-    return grader(env)
+        raw = 0.0
+    else:
+        grader = {
+            "task_easy": grade_task_easy,
+            "task_medium": grade_task_medium,
+            "task_hard": grade_task_hard,
+            "task_expert": grade_task_expert,
+            "task_nightmare": grade_task_nightmare,
+        }.get(env.task_config.task_id)
+        raw = grader(env) if grader is not None else env.current_reward
+    # Validator requires score strictly in (0, 1) — not 0.0 and not 1.0
+    return max(0.01, min(0.99, raw))
 
 
 def grade_task_easy(env: HospitalEnv) -> float:
