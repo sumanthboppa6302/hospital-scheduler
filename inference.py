@@ -115,13 +115,26 @@ def parse_action(text: str) -> dict | None:
     return None
 
 
+def _unwrap_obs(raw: dict) -> dict:
+    """Handle both flat and OpenEnv-wrapped observation formats."""
+    if "observation" in raw and isinstance(raw["observation"], dict):
+        obs = raw["observation"]
+        obs.setdefault("reward", raw.get("reward", 0.0))
+        obs.setdefault("done", raw.get("done", False))
+        return obs
+    return raw
+
+
 def run_task(server_url: str, task_id: str, client: OpenAI, model: str) -> float:
     base = server_url.rstrip("/")
+
+    # ── Structured output: task start ──────────────────────────────────────
+    print(f"[START] task={task_id}", flush=True)
 
     # Reset environment
     resp = requests.post(f"{base}/reset", json={"task_id": task_id}, timeout=30)
     resp.raise_for_status()
-    obs = resp.json()
+    obs = _unwrap_obs(resp.json())
 
     print(f"\n{'='*65}")
     print(f"  Task : {task_id}")
@@ -134,6 +147,9 @@ def run_task(server_url: str, task_id: str, client: OpenAI, model: str) -> float
     messages = [
         {"role": "user", "content": f"Task:\n{obs['message']}\n\nBegin. What is your first action?"}
     ]
+
+    last_reward = 0.0
+    steps_used = 0
 
     for step_i in range(1, max_steps + 1):
         # Ask LLM for next action
@@ -162,10 +178,16 @@ def run_task(server_url: str, task_id: str, client: OpenAI, model: str) -> float
             timeout=30,
         )
         step_resp.raise_for_status()
-        obs = step_resp.json()
+        obs = _unwrap_obs(step_resp.json())
 
-        icon = "[OK]" if obs["status"] == "success" else "[!!]" if obs["status"] == "warning" else "[ERR]"
-        print(f"  Step {step_i:2d}: {action_type:<28} {icon} {obs['message'][:60]}")
+        last_reward = float(obs.get("reward", last_reward))
+        steps_used = step_i
+
+        icon = "[OK]" if obs.get("status") == "success" else "[!!]" if obs.get("status") == "warning" else "[ERR]"
+        print(f"  Step {step_i:2d}: {action_type:<28} {icon} {obs.get('message','')[:60]}")
+
+        # ── Structured output: per-step ────────────────────────────────────
+        print(f"[STEP] step={step_i} reward={last_reward:.4f}", flush=True)
 
         if obs.get("done"):
             break
@@ -178,12 +200,23 @@ def run_task(server_url: str, task_id: str, client: OpenAI, model: str) -> float
         result_text += "\n\nWhat is your next action?"
         messages.append({"role": "user", "content": result_text})
 
-    # Get final score
-    grade_resp = requests.get(f"{base}/grade", timeout=30)
-    grade_resp.raise_for_status()
-    result = grade_resp.json()
-    score = result.get("score", 0.0)
-    print(f"\n  Score: {score:.2f} / 1.00   (steps used: {result.get('steps_used', '?')} / {max_steps})")
+    # Try /grade endpoint; fall back to last observed reward
+    score = last_reward
+    try:
+        grade_resp = requests.get(f"{base}/grade", timeout=15)
+        if grade_resp.ok:
+            result = grade_resp.json()
+            if isinstance(result.get("score"), (int, float)):
+                score = float(result["score"])
+                steps_used = result.get("steps_used", steps_used)
+    except Exception:
+        pass  # use last_reward as score
+
+    print(f"\n  Score: {score:.4f} / 1.00   (steps used: {steps_used} / {max_steps})")
+
+    # ── Structured output: task end ────────────────────────────────────────
+    print(f"[END] task={task_id} score={score:.4f} steps={steps_used}", flush=True)
+
     return score
 
 

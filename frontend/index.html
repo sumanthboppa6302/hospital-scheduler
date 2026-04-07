@@ -302,28 +302,49 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 8px 12px;
+      padding: 10px 14px;
       cursor: pointer;
       user-select: none;
+      min-height: 44px;
+      color: #1f2937;        /* explicit — never invisible regardless of bg */
     }
-    .log-entry-header:hover { opacity: .9; }
+    .log-entry-header:hover { filter: brightness(.96); }
 
     .entry-step {
       font-size: 11px;
       font-weight: 700;
-      padding: 2px 7px;
+      padding: 3px 8px;
       border-radius: 12px;
-      background: rgba(255,255,255,.4);
+      background: rgba(0,0,0,.10);
+      color: #1f2937;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
-    .entry-action { font-weight: 600; font-size: 13px; flex: 1; }
+    .entry-action {
+      font-weight: 700;
+      font-size: 13px;
+      flex: 1;
+      color: #1f2937;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     .entry-status {
       font-size: 11px;
-      font-weight: 600;
-      padding: 2px 8px;
+      font-weight: 700;
+      padding: 3px 8px;
       border-radius: 12px;
-      background: rgba(255,255,255,.4);
+      background: rgba(0,0,0,.10);
+      color: #1f2937;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
-    .entry-toggle { font-size: 11px; opacity: .6; margin-left: 4px; }
+    .entry-toggle {
+      font-size: 12px;
+      color: #374151;
+      margin-left: 2px;
+      flex-shrink: 0;
+    }
 
     .log-entry-body {
       padding: 10px 12px;
@@ -349,9 +370,9 @@
       font-size: 12px;
       font-family: 'Consolas', 'Monaco', monospace;
       color: var(--gray-700);
-      overflow-x: auto;
+      overflow: auto;
       white-space: pre;
-      /* no max-height — show full JSON */
+      max-height: 320px;
     }
 
     /* Entry type colors */
@@ -788,7 +809,7 @@ function updateStats(obs) {
   }
 }
 
-function addLogEntry(type, label, obs, colorClass, step) {
+function addLogEntry(type, label, obs, colorClass, step, actionLabel) {
   const empty = document.getElementById('log-empty');
   if (empty) empty.remove();
 
@@ -797,7 +818,7 @@ function addLogEntry(type, label, obs, colorClass, step) {
   el.className = 'log-entry';
 
   const stepLabel = step != null ? `#${step}` : type === 'reset' ? 'RESET' : '';
-  const actionType = window._lastActionType || label;
+  const actionType = actionLabel || window._lastActionType || label;
   const statusText = obs.status || label;
 
   // Reset and error entries start expanded; steps start collapsed so all are visible
@@ -812,7 +833,7 @@ function addLogEntry(type, label, obs, colorClass, step) {
     </div>
     <div class="log-entry-body${startOpen ? ' open' : ''}">
       <div class="entry-message">${escHtml(obs.message || '')}</div>
-      ${obs.data && Object.keys(obs.data).length ? `<div class="entry-data">${escHtml(JSON.stringify(obs.data, null, 2))}</div>` : ''}
+      ${obs.data && typeof obs.data === 'object' && Object.keys(obs.data).length ? `<div class="entry-data">${escHtml(JSON.stringify(obs.data, null, 2))}</div>` : ''}
     </div>
   `;
 
@@ -1107,7 +1128,7 @@ function handleAgentEvent(type, data) {
     addLogEntry('step', data.status, {
       message: data.message, status: data.status, data: data.data,
       reward: data.reward, done: data.done,
-    }, cls, stepNumber);
+    }, cls, stepNumber, data.action_type);
 
     document.getElementById('agent-status').textContent = `Step ${stepNumber} / ${maxSteps}`;
 
@@ -1168,6 +1189,8 @@ document.addEventListener('keydown', (e) => {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function escHtml(s) {
+  if (s == null) return '';
+  if (typeof s !== 'string') s = String(s);
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
