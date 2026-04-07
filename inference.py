@@ -33,6 +33,11 @@ SPACE_URL = "https://Sumanth73-hospital-scheduler.hf.space"
 ENV_BENCHMARK = "hospital_scheduler"
 SUCCESS_THRESHOLD = 0.1
 
+# ── Required env-var variables (checklist: only API_BASE_URL and MODEL_NAME have defaults) ──
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
+HF_TOKEN = os.getenv("HF_TOKEN")          # intentionally no default
+
 TASK_IDS = ["task_easy", "task_medium", "task_hard", "task_expert", "task_nightmare"]
 
 SYSTEM_PROMPT = """You are a hospital appointment scheduling agent at CrestView Medical Center (v2.1.0).
@@ -107,13 +112,11 @@ def _log_end(success: bool, steps: int, score: float, rewards: list[float]) -> N
 # ── LLM helpers ────────────────────────────────────────────────────────────
 
 def get_llm_client() -> OpenAI:
-    api_base = os.environ.get("API_BASE_URL", "https://router.huggingface.co/v1")
-    hf_token = os.environ.get("HF_TOKEN", "")
-    return OpenAI(base_url=api_base, api_key=hf_token)
+    return OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN or "")
 
 
 def get_model() -> str:
-    return os.environ.get("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
+    return MODEL_NAME
 
 
 def parse_action(text: str) -> dict | None:
@@ -282,10 +285,8 @@ def main():
     parser.add_argument("--tasks", nargs="*", default=TASK_IDS, help="Task IDs to run")
     args = parser.parse_args()
 
-    missing = [v for v in ("API_BASE_URL", "MODEL_NAME", "HF_TOKEN") if not os.environ.get(v)]
-    if missing:
-        print(f"[WARN] Missing env vars: {', '.join(missing)}")
-        print("       Using defaults. Set these for proper LLM inference.\n")
+    if not HF_TOKEN:
+        print("[WARN] HF_TOKEN not set — LLM calls may fail without a valid API key.\n")
 
     client = get_llm_client()
     model = get_model()
