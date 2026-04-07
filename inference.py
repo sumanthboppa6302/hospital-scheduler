@@ -13,6 +13,11 @@ Usage:
     python inference.py
     python inference.py --tasks task_easy task_medium
     python inference.py --server http://localhost:7860
+
+STDOUT FORMAT (required by hackathon validator):
+    [START] task=<task_name> env=<benchmark> model=<model_name>
+    [STEP]  step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
+    [END]   success=<true|false> steps=<n> score=<0.00> rewards=<r1,r2,...,rn>
 """
 
 from __future__ import annotations
@@ -25,6 +30,8 @@ import requests
 from openai import OpenAI
 
 SPACE_URL = "https://Sumanth73-hospital-scheduler.hf.space"
+ENV_BENCHMARK = "hospital_scheduler"
+SUCCESS_THRESHOLD = 0.1
 
 TASK_IDS = ["task_easy", "task_medium", "task_hard", "task_expert", "task_nightmare"]
 
@@ -71,6 +78,34 @@ Respond with ONLY a valid JSON object, no explanation, no markdown:
 {"action_type": "...", "parameters": {...}}"""
 
 
+# ── Structured output helpers ──────────────────────────────────────────────
+
+def _log_start(task: str, model: str) -> None:
+    print(f"[START] task={task} env={ENV_BENCHMARK} model={model}", flush=True)
+
+
+def _log_step(step: int, action_type: str, parameters: dict,
+              reward: float, done: bool, error: str | None) -> None:
+    action_str = f"{action_type}({json.dumps(parameters, separators=(',', ':'))})"
+    error_val = error if error else "null"
+    print(
+        f"[STEP] step={step} action={action_str} "
+        f"reward={reward:.2f} done={str(done).lower()} error={error_val}",
+        flush=True,
+    )
+
+
+def _log_end(success: bool, steps: int, score: float, rewards: list[float]) -> None:
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    print(
+        f"[END] success={str(success).lower()} steps={steps} "
+        f"score={score:.2f} rewards={rewards_str}",
+        flush=True,
+    )
+
+
+# ── LLM helpers ────────────────────────────────────────────────────────────
+
 def get_llm_client() -> OpenAI:
     api_base = os.environ.get("API_BASE_URL", "https://router.huggingface.co/v1")
     hf_token = os.environ.get("HF_TOKEN", "")
@@ -86,7 +121,6 @@ def parse_action(text: str) -> dict | None:
     if "```" in text:
         text = re.sub(r"```(?:json)?", "", text).strip()
 
-    # Try full text first
     try:
         data = json.loads(text)
         if isinstance(data, dict) and data.get("action_type"):
@@ -125,97 +159,119 @@ def _unwrap_obs(raw: dict) -> dict:
     return raw
 
 
+# ── Task runner ────────────────────────────────────────────────────────────
+
 def run_task(server_url: str, task_id: str, client: OpenAI, model: str) -> float:
     base = server_url.rstrip("/")
 
-    # ── Structured output: task start ──────────────────────────────────────
-    print(f"[START] task={task_id}", flush=True)
-
-    # Reset environment
-    resp = requests.post(f"{base}/reset", json={"task_id": task_id}, timeout=30)
-    resp.raise_for_status()
-    obs = _unwrap_obs(resp.json())
-
-    print(f"\n{'='*65}")
-    print(f"  Task : {task_id}")
-    print(f"  Model: {model}")
-    print(f"{'='*65}")
-    print(f"  {obs['message'].splitlines()[0][:100]}")
-    print()
-
-    max_steps = obs.get("max_steps", 30)
-    messages = [
-        {"role": "user", "content": f"Task:\n{obs['message']}\n\nBegin. What is your first action?"}
-    ]
-
-    last_reward = 0.0
+    rewards: list[float] = []
     steps_used = 0
+    score = 0.0
+    success = False
 
-    for step_i in range(1, max_steps + 1):
-        # Ask LLM for next action
-        response = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "system", "content": SYSTEM_PROMPT}] + messages,
-            max_tokens=256,
-            temperature=0.0,
-        )
-        llm_text = response.choices[0].message.content or ""
+    _log_start(task_id, model)
 
-        action_data = parse_action(llm_text)
-        if action_data is None:
-            # Ask LLM to fix its response
-            messages.append({"role": "assistant", "content": llm_text})
-            messages.append({"role": "user", "content": "Invalid JSON. Respond with ONLY a JSON action object."})
-            continue
-
-        action_type = action_data.get("action_type", "unknown")
-        parameters = action_data.get("parameters", {})
-
-        # Execute action
-        step_resp = requests.post(
-            f"{base}/step",
-            json={"action": {"action_type": action_type, "parameters": parameters}},
-            timeout=30,
-        )
-        step_resp.raise_for_status()
-        obs = _unwrap_obs(step_resp.json())
-
-        last_reward = float(obs.get("reward", last_reward))
-        steps_used = step_i
-
-        icon = "[OK]" if obs.get("status") == "success" else "[!!]" if obs.get("status") == "warning" else "[ERR]"
-        print(f"  Step {step_i:2d}: {action_type:<28} {icon} {obs.get('message','')[:60]}")
-
-        # ── Structured output: per-step ────────────────────────────────────
-        print(f"[STEP] step={step_i} reward={last_reward:.4f}", flush=True)
-
-        if obs.get("done"):
-            break
-
-        # Feed result back to LLM
-        messages.append({"role": "assistant", "content": json.dumps(action_data)})
-        result_text = f"Result: {obs['message']}"
-        if obs.get("data"):
-            result_text += f"\nData: {json.dumps(obs['data'])[:500]}"
-        result_text += "\n\nWhat is your next action?"
-        messages.append({"role": "user", "content": result_text})
-
-    # Try /grade endpoint; fall back to last observed reward
-    score = last_reward
     try:
-        grade_resp = requests.get(f"{base}/grade", timeout=15)
-        if grade_resp.ok:
-            result = grade_resp.json()
-            if isinstance(result.get("score"), (int, float)):
-                score = float(result["score"])
-                steps_used = result.get("steps_used", steps_used)
-    except Exception:
-        pass  # use last_reward as score
+        resp = requests.post(f"{base}/reset", json={"task_id": task_id}, timeout=30)
+        resp.raise_for_status()
+        obs = _unwrap_obs(resp.json())
 
-    print(f"\n  Score: {score:.4f} / 1.00   (steps used: {steps_used} / {max_steps})")
+        print(f"\n{'='*65}")
+        print(f"  Task : {task_id}")
+        print(f"  Model: {model}")
+        print(f"{'='*65}")
+        print(f"  {obs['message'].splitlines()[0][:100]}")
+        print()
 
-    # ── Structured output: task end ────────────────────────────────────────
-    print(f"[END] task={task_id} score={score:.4f} steps={steps_used}", flush=True)
+        max_steps = obs.get("max_steps", 30)
+        messages = [
+            {"role": "user", "content": f"Task:\n{obs['message']}\n\nBegin. What is your first action?"}
+        ]
+
+        for step_i in range(1, max_steps + 1):
+            # Ask LLM for next action
+            response = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "system", "content": SYSTEM_PROMPT}] + messages,
+                max_tokens=256,
+                temperature=0.0,
+            )
+            llm_text = response.choices[0].message.content or ""
+
+            action_data = parse_action(llm_text)
+            if action_data is None:
+                messages.append({"role": "assistant", "content": llm_text})
+                messages.append({"role": "user", "content": "Invalid JSON. Respond with ONLY a JSON action object."})
+                continue
+
+            action_type = action_data.get("action_type", "unknown")
+            parameters = action_data.get("parameters", {})
+
+            # Execute action in environment
+            step_error: str | None = None
+            try:
+                step_resp = requests.post(
+                    f"{base}/step",
+                    json={"action": {"action_type": action_type, "parameters": parameters}},
+                    timeout=30,
+                )
+                step_resp.raise_for_status()
+                obs = _unwrap_obs(step_resp.json())
+            except Exception as exc:
+                step_error = str(exc)
+                _log_step(step_i, action_type, parameters, 0.0, False, step_error)
+                rewards.append(0.0)
+                steps_used = step_i
+                break
+
+            step_reward = float(obs.get("reward", 0.0))
+            done = bool(obs.get("done", False))
+
+            # Treat env-level errors as non-null error field
+            if obs.get("status") == "error":
+                step_error = obs.get("message", "error")[:120]
+
+            rewards.append(step_reward)
+            steps_used = step_i
+
+            icon = "[OK]" if obs.get("status") == "success" else \
+                   "[!!]" if obs.get("status") == "warning" else "[ERR]"
+            print(f"  Step {step_i:2d}: {action_type:<28} {icon} {obs.get('message', '')[:60]}")
+
+            _log_step(step_i, action_type, parameters, step_reward, done, step_error)
+
+            if done:
+                break
+
+            messages.append({"role": "assistant", "content": json.dumps(action_data)})
+            result_text = f"Result: {obs['message']}"
+            if obs.get("data"):
+                result_text += f"\nData: {json.dumps(obs['data'])[:500]}"
+            result_text += "\n\nWhat is your next action?"
+            messages.append({"role": "user", "content": result_text})
+
+        # Score: try /grade endpoint, fall back to last observed reward
+        score = rewards[-1] if rewards else 0.0
+        try:
+            grade_resp = requests.get(f"{base}/grade", timeout=15)
+            if grade_resp.ok:
+                result = grade_resp.json()
+                if isinstance(result.get("score"), (int, float)):
+                    score = float(result["score"])
+                    steps_used = result.get("steps_used", steps_used)
+        except Exception:
+            pass
+
+        print(f"\n  Score: {score:.4f} / 1.00   (steps used: {steps_used} / {max_steps})")
+        success = score >= SUCCESS_THRESHOLD
+
+    except Exception as exc:
+        print(f"  [ERROR] {task_id}: {exc}")
+        score = 0.0
+        success = False
+
+    finally:
+        _log_end(success, steps_used, score, rewards)
 
     return score
 
@@ -226,7 +282,6 @@ def main():
     parser.add_argument("--tasks", nargs="*", default=TASK_IDS, help="Task IDs to run")
     args = parser.parse_args()
 
-    # Validate env vars
     missing = [v for v in ("API_BASE_URL", "MODEL_NAME", "HF_TOKEN") if not os.environ.get(v)]
     if missing:
         print(f"[WARN] Missing env vars: {', '.join(missing)}")
